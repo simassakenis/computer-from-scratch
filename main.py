@@ -1,294 +1,19 @@
-import time
-import keyboard
-from termcolor import colored
-
-
-class Leg:
-    def __init__(self, parent, c=None):
-        self.parent = parent # component whose leg this leg is
-        self.c = c # component that this leg is connected to
-        self.val = 0 # value of this leg
-
-
-class Branch:
-    def __init__(self, i=None, o1=None, o2=None):
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o1 = Leg(self, o1.parent if o1 is not None else None)
-        if o1 is not None: o1.c = self
-        self.o2 = Leg(self, o2.parent if o2 is not None else None)
-        if o2 is not None: o2.c = self
-
-    def update_right(self, c, val):
-        if self.i.val != val:
-            self.i.val = val
-            self.o1.c.update_right(self, val)
-            self.o2.c.update_right(self, val)
-
-    def update_left(self, c, val):
-        assert c == self.o1.c or c == self.o2.c
-        if c == self.o1.c and self.o1.val != val:
-            if self.o1.val == -1:
-                self.o2.c.update_right(self, self.i.val)
-            self.o1.val = val
-            if val == -1:
-                self.o2.c.update_right(self, 0)
-            if self.o1.val == 0 or self.o2.val == 0:
-                self.i.c.update_left(self, self.o1.val + self.o2.val)
-            else:
-                self.i.c.update_left(self, self.o1.val * self.o2.val)
-        elif c == self.o2.c and self.o2.val != val:
-            if self.o2.val == -1:
-                self.o1.c.update_right(self, self.i.val)
-            self.o2.val = val
-            if val == -1:
-                self.o1.c.update_right(self, 0)
-            if self.o1.val == 0 or self.o2.val == 0:
-                self.i.c.update_left(self, self.o1.val + self.o2.val)
-            else:
-                self.i.c.update_left(self, self.o1.val * self.o2.val)
-
-
-class Branch21:
-    def __init__(self, i1=None, i2=None, o=None):
-        self.i1 = Leg(self, i1.parent if i1 is not None else None)
-        if i1 is not None: i1.c = self
-        self.i2 = Leg(self, i2.parent if i2 is not None else None)
-        if i2 is not None: i2.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
-
-    def update_right(self, c, val):
-        assert c == self.i1.c or c == self.i2.c
-        if c == self.i1.c and self.i1.val != val:
-            self.i1.val = val
-            self.o.c.update_right(self, max(self.i1.val, self.i2.val))
-        elif c == self.i2.c and self.i2.val != val:
-            self.i2.val = val
-            self.o.c.update_right(self, max(self.i1.val, self.i2.val))
-
-    def update_left(self, c, val):
-        if self.o.val != val:
-            self.o.val = val
-            self.i1.c.update_left(self, self.o.val)
-            self.i2.c.update_left(self, self.o.val)
-
-
-class Plus:
-    def __init__(self):
-        self.o = Leg(self)
-
-    def update_right(self, c, val):
-        self.o.c.update_right(self, 1)
-
-    def update_left(self, c, val):
-        pass
-
-
-class Minus:
-    def __init__(self):
-        self.i = Leg(self)
-
-    def update_right(self, c, val):
-        self.i.c.update_left(self, -val)
-
-
-class Switch:
-    def __init__(self, i=None, o=None):
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
-        self.pos = 0
-
-    def toggle(self):
-        self.pos = abs(self.pos - 1)
-        self.o.c.update_right(self, self.i.val * self.pos)
-
-    def update_right(self, c, val):
-        if self.i.val != val:
-            self.i.val = val
-            self.o.c.update_right(self, self.i.val * self.pos)
-
-    def update_left(self, c, val):
-        if self.o.val != val:
-            self.o.val = val
-            self.i.c.update_left(self, self.o.val * self.pos)
-
-    def state(self):
-        return abs(self.i.val * self.o.val * self.pos)
-
-
-class Bulb:
-    def __init__(self, i=None, o=None):
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
-        
-    def update_right(self, c, val):
-        if self.i.val != val:
-            self.i.val = val
-            self.o.c.update_right(self, val)
-
-    def update_left(self, c, val):
-        if self.o.val != val:
-            self.o.val = val
-            self.i.c.update_left(self, abs(val))
-
-    def state(self):
-        return abs(self.i.val * self.o.val)
-
-
-class Transistor:
-    def __init__(self, switch=None, i=None, o=None):
-        self.switch = Leg(self, switch.parent if switch is not None else None)
-        if switch is not None: switch.c = self
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
-
-    def update_right(self, c, val):
-        assert c == self.i.c or c == self.switch.c
-        if c == self.i.c and self.i.val != val:
-            self.i.val = val
-            self.o.c.update_right(self, self.i.val * self.switch.val)
-        elif c == self.switch.c and self.switch.val != val:
-            self.switch.val = val
-            self.switch.c.update_left(self, 1)
-            self.o.c.update_right(self, self.i.val * self.switch.val)
-
-    def update_left(self, c, val):
-        self.o.val = val
-        self.i.c.update_left(self, self.o.val * self.switch.val)
-
-    def state(self):
-        return abs(self.i.val * self.o.val * self.switch.val)
-
-
-class Circuit:
-    def __init__(self):
-        self.plusses = []
-        self.minuses = []
-
-    def add_plus(self):
-        plus = Plus()
-        self.plusses.append(plus)
-        return plus
-
-    def add_minus(self):
-        minus = Minus()
-        self.minuses.append(minus)
-        return minus
-
-    def update(self):
-        for p in self.plusses:
-            p.update_right(None, None)
-
-    def display(self, gadgets):
-        indicators = ''
-        for gadget in gadgets:
-            indicators += colored('● ', 'green' if gadget.state() else 'grey')
-        print('\t' + indicators, end='\r')
-
-
-class NOT:
-    def __init__(self, circuit, i=None, o=None):
-        plus = circuit.add_plus()
-        minus = circuit.add_minus()
-        branch = Branch(i=plus.o)
-        self.transistor = Transistor(i=branch.o2, o=minus.i)
-        self.i = self.transistor.switch
-        if i is not None:
-            self.i.c = i.parent
-            i.c = self.i.parent
-        self.o = branch.o1
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
-
-
-class AND:
-    def __init__(self, circuit, i1=None, i2=None, o=None):
-        plus = circuit.add_plus()
-        transistor1 = Transistor(i=plus.o)
-        transistor2 = Transistor(i=transistor1.o)
-        self.i1 = transistor1.switch
-        if i1 is not None:
-            self.i1.c = i1.parent
-            i1.c = self.i1.parent
-        self.i2 = transistor2.switch
-        if i2 is not None:
-            self.i2.c = i2.parent
-            i2.c = self.i2.parent
-        self.o = transistor2.o
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
-
-
-class OR:
-    def __init__(self, circuit, i1=None, i2=None, o=None):
-        plus = circuit.add_plus()
-        branch12 = Branch(i=plus.o)
-        branch21 = Branch21()
-        self.transistor1 = Transistor(i=branch12.o1, o=branch21.i1)
-        self.transistor2 = Transistor(i=branch12.o2, o=branch21.i2)
-        self.i1 = self.transistor1.switch
-        if i1 is not None:
-            self.i1.c = i1.parent
-            i1.c = self.i1.parent
-        self.i2 = self.transistor2.switch
-        if i2 is not None:
-            self.i2.c = i2.parent
-            i2.c = self.i2.parent
-        self.o = branch21.o
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
-
-
-class DLatch:
-    def __init__(self, circuit, i1=None, i2=None, o=None):
-        # D latch demo
-        branch121 = Branch()
-        branch122 = Branch()
-        and_gate1 = AND(circuit=circuit, i1=branch121.o1, i2=branch122.o1)
-        not_gate1 = NOT(circuit=circuit, i=branch121.o2)
-        and_gate2 = AND(circuit=circuit, i1=not_gate1.o, i2=branch122.o2)
-        or_gate = OR(circuit=circuit, i2=and_gate1.o)
-        not_gate2 = NOT(circuit=circuit, i=and_gate2.o)
-        and_gate2 = AND(circuit=circuit, i1=or_gate.o, i2=not_gate2.o)
-        branch123 = Branch(i=and_gate2.o, o2=or_gate.i1)
-        self.i1 = branch121.i
-        if i1 is not None:
-            self.i1.c = i1.parent
-            i1.c = self.i1.parent
-        self.i2 = branch122.i
-        if i2 is not None:
-            self.i2.c = i2.parent
-            i2.c = self.i2.parent
-        self.o = branch123.o1
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
-
-
-def user_pressed(jungiklis, circuit, gadgets):
-    jungiklis.toggle()
-    circuit.display(gadgets)
+import graphics
+from components import (
+    Branch12, Branch21, Plus, Minus, Switch, Bulb, Transistor,
+    NOT, AND, OR, DLatch,
+    Circuit, Display
+)
 
 
 if __name__ == '__main__':
-    print()
-
     # # basic demo
     # circuit = Circuit()
     # plus = circuit.add_plus()
     # minus = circuit.add_minus()
     # jungiklis = Switch(i=plus.o)
     # lempute = Bulb(i=jungiklis.o, o=minus.i)
+    # display = Display([jungiklis, lempute], ['I', 'O'])
 
     # # NOT demo
     # circuit = Circuit()
@@ -301,6 +26,7 @@ if __name__ == '__main__':
     # not_gate3 = NOT(circuit=circuit, i=not_gate2.o)
     # not_gate4 = NOT(circuit=circuit, i=not_gate3.o)
     # not_gate5 = NOT(circuit=circuit, i=not_gate4.o, o=lempute.i)
+    # display = Display([jungiklis, lempute], ['I', 'O'])
 
     # # AND demo
     # circuit = Circuit()
@@ -311,6 +37,7 @@ if __name__ == '__main__':
     # jungiklis2 = Switch(i=plus2.o)
     # and_gate = AND(circuit=circuit, i1=jungiklis1.o, i2=jungiklis2.o)
     # lempute = Bulb(i=and_gate.o, o=minus.i)
+    # display = Display([jungiklis1, jungiklis2, lempute], ['I1', 'I2', 'O'])
 
     # # OR demo
     # circuit = Circuit()
@@ -321,6 +48,7 @@ if __name__ == '__main__':
     # jungiklis2 = Switch(i=plus2.o)
     # or_gate = OR(circuit=circuit, i1=jungiklis1.o, i2=jungiklis2.o)
     # lempute = Bulb(i=or_gate.o, o=minus.i)
+    # display = Display([jungiklis1, jungiklis2, lempute], ['I1', 'I2', 'O'])
 
     # # XOR demo
     # circuit = Circuit()
@@ -329,13 +57,14 @@ if __name__ == '__main__':
     # minus = circuit.add_minus()
     # jungiklis1 = Switch(i=plus1.o)
     # jungiklis2 = Switch(i=plus2.o)
-    # branch121 = Branch(i=jungiklis1.o)
-    # branch122 = Branch(i=jungiklis2.o)
+    # branch121 = Branch12(i=jungiklis1.o)
+    # branch122 = Branch12(i=jungiklis2.o)
     # and_gate = AND(circuit=circuit, i1=branch121.o1, i2=branch122.o1)
     # not_gate = NOT(circuit=circuit, i=and_gate.o)
     # or_gate = OR(circuit=circuit, i1=branch121.o2, i2=branch122.o2)
     # and_gate2 = AND(circuit=circuit, i1=not_gate.o, i2=or_gate.o)
     # lempute = Bulb(i=and_gate2.o, o=minus.i)
+    # display = Display([jungiklis1, jungiklis2, lempute], ['I1', 'I2', 'O'])
 
     # # OR loop demo
     # circuit = Circuit()
@@ -343,8 +72,9 @@ if __name__ == '__main__':
     # minus = circuit.add_minus()
     # jungiklis = Switch(i=plus.o)
     # or_gate = OR(circuit=circuit, i1=jungiklis.o)
-    # branch12 = Branch(i=or_gate.o, o2=or_gate.i2)
+    # branch12 = Branch12(i=or_gate.o, o2=or_gate.i2)
     # lempute = Bulb(i=branch12.o1, o=minus.i)
+    # display = Display([jungiklis, lempute], ['I', 'O'])
 
     # # SR latch demo
     # circuit = Circuit()
@@ -356,8 +86,9 @@ if __name__ == '__main__':
     # or_gate = OR(circuit=circuit, i2=jungiklis1.o)
     # not_gate = NOT(circuit=circuit, i=jungiklis2.o)
     # and_gate = AND(circuit=circuit, i1=or_gate.o, i2=not_gate.o)
-    # branch12 = Branch(i=and_gate.o, o2=or_gate.i1)
+    # branch12 = Branch12(i=and_gate.o, o2=or_gate.i1)
     # lempute = Bulb(i=branch12.o1, o=minus.i)
+    # display = Display([jungiklis1, jungiklis2, lempute], ['S', 'R', 'O'])
 
     # D latch demo
     circuit = Circuit()
@@ -368,16 +99,18 @@ if __name__ == '__main__':
     jungiklis2 = Switch(i=plus2.o)
     dlatch = DLatch(circuit=circuit, i1=jungiklis1.o, i2=jungiklis2.o)
     lempute = Bulb(i=dlatch.o, o=minus.i)
+    display = Display([jungiklis1, jungiklis2, lempute], ['D', 'WE', 'O'])
 
-    # circuit.update()
-    # circuit.display([jungiklis, lempute])
-    # keyboard.on_press_key('a', lambda _: user_pressed(jungiklis, circuit, [jungiklis, lempute]))
-
-    circuit.update()
-    circuit.display([jungiklis1, jungiklis2, lempute])
-    keyboard.on_press_key('a', lambda _: user_pressed(jungiklis1, circuit, [jungiklis1, jungiklis2, lempute]))
-    keyboard.on_press_key('s', lambda _: user_pressed(jungiklis2, circuit, [jungiklis1, jungiklis2, lempute]))
-
+    circuit.initialize()
     while True:
-        time.sleep(60)
+        control_keys = ['a', 's']
+        key = display.win.getKey()
+        if key == 'q':
+            break
+        elif key in control_keys:
+            idx = control_keys.index(key)
+            display.components[idx].toggle()
+            display.update()
+
+    display.win.close()
 
