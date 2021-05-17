@@ -1,4 +1,5 @@
 import graphics
+import time
 
 # Color constants
 lightGray = graphics.color_rgb(245, 245, 245)
@@ -17,7 +18,7 @@ class Leg:
 
 
 class Branch12:
-    def __init__(self, i=None, o1=None, o2=None):
+    def __init__(self, circuit, i=None, o1=None, o2=None):
         self.i = Leg(self, i.parent if i is not None else None)
         if i is not None: i.c = self
         self.o1 = Leg(self, o1.parent if o1 is not None else None)
@@ -28,8 +29,10 @@ class Branch12:
     def update_right(self, c, val):
         if self.i.val != val:
             self.i.val = val
-            self.o1.c.update_right(self, val)
-            self.o2.c.update_right(self, val)
+            if self.o1.c is not None:
+                self.o1.c.update_right(self, val)
+            if self.o2.c is not None:
+                self.o2.c.update_right(self, val)
 
     def update_left(self, c, val):
         assert c == self.o1.c or c == self.o2.c
@@ -56,7 +59,7 @@ class Branch12:
 
 
 class Branch21:
-    def __init__(self, i1=None, i2=None, o=None):
+    def __init__(self, circuit, i1=None, i2=None, o=None):
         self.i1 = Leg(self, i1.parent if i1 is not None else None)
         if i1 is not None: i1.c = self
         self.i2 = Leg(self, i2.parent if i2 is not None else None)
@@ -68,10 +71,12 @@ class Branch21:
         assert c == self.i1.c or c == self.i2.c
         if c == self.i1.c and self.i1.val != val:
             self.i1.val = val
-            self.o.c.update_right(self, max(self.i1.val, self.i2.val))
+            if self.o.c is not None:
+                self.o.c.update_right(self, max(self.i1.val, self.i2.val))
         elif c == self.i2.c and self.i2.val != val:
             self.i2.val = val
-            self.o.c.update_right(self, max(self.i1.val, self.i2.val))
+            if self.o.c is not None:
+                self.o.c.update_right(self, max(self.i1.val, self.i2.val))
 
     def update_left(self, c, val):
         if self.o.val != val:
@@ -81,18 +86,20 @@ class Branch21:
 
 
 class Plus:
-    def __init__(self):
+    def __init__(self, circuit):
         self.o = Leg(self)
+        circuit.plusses.append(self)
 
     def update_right(self, c, val):
-        self.o.c.update_right(self, 1)
+        if self.o.c is not None:
+            self.o.c.update_right(self, 1)
 
     def update_left(self, c, val):
         pass
 
 
 class Minus:
-    def __init__(self):
+    def __init__(self, circuit):
         self.i = Leg(self)
 
     def update_right(self, c, val):
@@ -100,21 +107,25 @@ class Minus:
 
 
 class Switch:
-    def __init__(self, i=None, o=None):
+    def __init__(self, circuit, i=None, o=None, key=None):
         self.i = Leg(self, i.parent if i is not None else None)
         if i is not None: i.c = self
         self.o = Leg(self, o.parent if o is not None else None)
         if o is not None: o.c = self
+        self.key = key
         self.pos = 0
+        circuit.interactive.append(self)
 
     def toggle(self):
         self.pos = abs(self.pos - 1)
-        self.o.c.update_right(self, self.i.val * self.pos)
+        if self.o.c is not None:
+            self.o.c.update_right(self, self.i.val * self.pos)
 
     def update_right(self, c, val):
         if self.i.val != val:
             self.i.val = val
-            self.o.c.update_right(self, self.i.val * self.pos)
+            if self.o.c is not None:
+                self.o.c.update_right(self, self.i.val * self.pos)
 
     def update_left(self, c, val):
         if self.o.val != val:
@@ -124,9 +135,15 @@ class Switch:
     def state(self):
         return abs(self.i.val * self.o.val * self.pos)
 
+    def update(self, key):
+        if key == self.key:
+            self.toggle()
+            return True
+        return False
+
 
 class Bulb:
-    def __init__(self, i=None, o=None):
+    def __init__(self, circuit, i=None, o=None):
         self.i = Leg(self, i.parent if i is not None else None)
         if i is not None: i.c = self
         self.o = Leg(self, o.parent if o is not None else None)
@@ -135,7 +152,8 @@ class Bulb:
     def update_right(self, c, val):
         if self.i.val != val:
             self.i.val = val
-            self.o.c.update_right(self, val)
+            if self.o.c is not None:
+                self.o.c.update_right(self, val)
 
     def update_left(self, c, val):
         if self.o.val != val:
@@ -147,7 +165,7 @@ class Bulb:
 
 
 class Transistor:
-    def __init__(self, switch=None, i=None, o=None):
+    def __init__(self, circuit, switch=None, i=None, o=None):
         self.switch = Leg(self, switch.parent if switch is not None else None)
         if switch is not None: switch.c = self
         self.i = Leg(self, i.parent if i is not None else None)
@@ -159,11 +177,13 @@ class Transistor:
         assert c == self.i.c or c == self.switch.c
         if c == self.i.c and self.i.val != val:
             self.i.val = val
-            self.o.c.update_right(self, self.i.val * self.switch.val)
+            if self.o.c is not None:
+                self.o.c.update_right(self, self.i.val * self.switch.val)
         elif c == self.switch.c and self.switch.val != val:
             self.switch.val = val
             self.switch.c.update_left(self, 1)
-            self.o.c.update_right(self, self.i.val * self.switch.val)
+            if self.o.c is not None:
+                self.o.c.update_right(self, self.i.val * self.switch.val)
 
     def update_left(self, c, val):
         self.o.val = val
@@ -178,10 +198,10 @@ class Transistor:
 
 class NOT:
     def __init__(self, circuit, i=None, o=None):
-        plus = circuit.add_plus()
-        minus = circuit.add_minus()
-        branch = Branch12(i=plus.o)
-        self.transistor = Transistor(i=branch.o2, o=minus.i)
+        plus = Plus(circuit=circuit)
+        minus = Minus(circuit=circuit)
+        branch = Branch12(circuit=circuit, i=plus.o)
+        self.transistor = Transistor(circuit=circuit, i=branch.o2, o=minus.i)
         self.i = self.transistor.switch
         if i is not None:
             self.i.c = i.parent
@@ -194,9 +214,9 @@ class NOT:
 
 class AND:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        plus = circuit.add_plus()
-        transistor1 = Transistor(i=plus.o)
-        transistor2 = Transistor(i=transistor1.o)
+        plus = Plus(circuit=circuit)
+        transistor1 = Transistor(circuit=circuit, i=plus.o)
+        transistor2 = Transistor(circuit=circuit, i=transistor1.o)
         self.i1 = transistor1.switch
         if i1 is not None:
             self.i1.c = i1.parent
@@ -213,11 +233,11 @@ class AND:
 
 class OR:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        plus = circuit.add_plus()
-        branch12 = Branch12(i=plus.o)
-        branch21 = Branch21()
-        self.transistor1 = Transistor(i=branch12.o1, o=branch21.i1)
-        self.transistor2 = Transistor(i=branch12.o2, o=branch21.i2)
+        plus = Plus(circuit=circuit)
+        branch12 = Branch12(circuit=circuit, i=plus.o)
+        branch21 = Branch21(circuit=circuit)
+        self.transistor1 = Transistor(circuit=circuit, i=branch12.o1, o=branch21.i1)
+        self.transistor2 = Transistor(circuit=circuit, i=branch12.o2, o=branch21.i2)
         self.i1 = self.transistor1.switch
         if i1 is not None:
             self.i1.c = i1.parent
@@ -234,15 +254,15 @@ class OR:
 
 class DLatch:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        branch121 = Branch12()
-        branch122 = Branch12()
+        branch121 = Branch12(circuit=circuit)
+        branch122 = Branch12(circuit=circuit)
         and_gate1 = AND(circuit=circuit, i1=branch121.o1, i2=branch122.o1)
         not_gate1 = NOT(circuit=circuit, i=branch121.o2)
         and_gate2 = AND(circuit=circuit, i1=not_gate1.o, i2=branch122.o2)
         or_gate = OR(circuit=circuit, i2=and_gate1.o)
         not_gate2 = NOT(circuit=circuit, i=and_gate2.o)
         and_gate2 = AND(circuit=circuit, i1=or_gate.o, i2=not_gate2.o)
-        branch123 = Branch12(i=and_gate2.o, o2=or_gate.i1)
+        branch123 = Branch12(circuit=circuit, i=and_gate2.o, o2=or_gate.i1)
         self.i1 = branch121.i
         if i1 is not None:
             self.i1.c = i1.parent
@@ -257,27 +277,64 @@ class DLatch:
             o.c = self.o.parent
 
 
+class Clock:
+    def __init__(self, circuit, o1=None, o2=None):
+        self.manual_mode = False
+        self.speed = 1 # in Hertz
+        self.delta = 0.5 # in Hertz
+        self.t = time.time()
+        plus1 = Plus(circuit=circuit)
+        plus2 = Plus(circuit=circuit)
+        self.switch = Switch(circuit=circuit, i=plus1.o)
+        self.edge_switch = Switch(circuit=circuit, i=plus2.o)
+        self.o1 = self.switch.o
+        if o1 is not None:
+            self.o1.c = o1.parent
+            o1.c = self.o1.parent
+        self.o2 = self.edge_switch.o
+        if o2 is not None:
+            self.o2.c = o2.parent
+            o2.c = self.o2.parent
+        circuit.interactive.append(self)
+
+    def update(self, key):
+        if key in ['minus', 'equal']:
+            self.speed += self.delta * (1 if key == 'equal' else -1)
+            if self.speed <= 0:
+                print('minimum clock speed reached')
+                self.speed = self.delta
+            print(f'clock speed: {self.speed} Hz')
+        elif key == 'x':
+            self.manual_mode = not self.manual_mode
+            print(f'clock mode: {"manual" if self.manual_mode else "automatic"}')
+
+        tock = time.time() - self.t >= 1 / (self.speed * 2)
+        if ((tock and self.switch.pos)
+            or (tock and not self.manual_mode)
+            or (key == 'c' and self.manual_mode and not self.switch.pos)):
+            self.t = time.time()
+            self.switch.toggle()
+            if self.switch.pos:
+                self.edge_switch.toggle()
+                self.edge_switch.toggle()
+            return True
+        return False
+
+
 # Circuit and display
 
 
 class Circuit:
     def __init__(self):
         self.plusses = []
-        self.minuses = []
-
-    def add_plus(self):
-        plus = Plus()
-        self.plusses.append(plus)
-        return plus
-
-    def add_minus(self):
-        minus = Minus()
-        self.minuses.append(minus)
-        return minus
+        self.interactive = []
 
     def initialize(self):
         for p in self.plusses:
             p.update_right(None, None)
+
+    def update(self, key):
+        return sum(c.update(key) for c in self.interactive) > 0
 
 
 class Display:
@@ -303,7 +360,7 @@ class Display:
                 graphics.Point(left_most_x + i * dist, 300),
                 radius=12
             )
-            self.indicators[i].setFill(black)
+            self.indicators[i].setFill(green if c.state() else black)
             self.indicators[i].setWidth(0)
             self.indicators[i].draw(self.win)
 
