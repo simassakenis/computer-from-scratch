@@ -206,10 +206,9 @@ class Transistor:
 
 class NOT:
     def __init__(self, circuit, i=None, o=None):
-        plus = Plus(circuit=circuit)
-        minus = Minus(circuit=circuit)
-        branch = Branch12(circuit=circuit, i=plus.o)
-        self.transistor = Transistor(circuit=circuit, i=branch.o2, o=minus.i)
+        branch = Branch12(circuit=circuit, i=circuit.add_plus().o)
+        self.transistor = Transistor(circuit=circuit, i=branch.o2,
+                                     o=circuit.add_minus().i)
         self.i = self.transistor.switch
         if i is not None:
             self.i.c = i.parent
@@ -222,8 +221,7 @@ class NOT:
 
 class AND:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        plus = Plus(circuit=circuit)
-        transistor1 = Transistor(circuit=circuit, i=plus.o)
+        transistor1 = Transistor(circuit=circuit, i=circuit.add_plus().o)
         transistor2 = Transistor(circuit=circuit, i=transistor1.o)
         self.i1 = transistor1.switch
         if i1 is not None:
@@ -241,8 +239,7 @@ class AND:
 
 class OR:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        plus = Plus(circuit=circuit)
-        branch12 = Branch12(circuit=circuit, i=plus.o)
+        branch12 = Branch12(circuit=circuit, i=circuit.add_plus().o)
         branch21 = Branch21(circuit=circuit)
         self.transistor1 = Transistor(circuit=circuit, i=branch12.o1, o=branch21.i1)
         self.transistor2 = Transistor(circuit=circuit, i=branch12.o2, o=branch21.i2)
@@ -255,6 +252,28 @@ class OR:
             self.i2.c = i2.parent
             i2.c = self.i2.parent
         self.o = branch21.o
+        if o is not None:
+            self.o.c = o.parent
+            o.c = self.o.parent
+
+
+class XOR:
+    def __init__(self, circuit, i1=None, i2=None, o=None):
+        branch121 = Branch12(circuit=circuit)
+        branch122 = Branch12(circuit=circuit)
+        and_gate = AND(circuit=circuit, i1=branch121.o1, i2=branch122.o1)
+        not_gate = NOT(circuit=circuit, i=and_gate.o)
+        or_gate = OR(circuit=circuit, i1=branch121.o2, i2=branch122.o2)
+        and_gate2 = AND(circuit=circuit, i1=not_gate.o, i2=or_gate.o)
+        self.i1 = branch121.i
+        if i1 is not None:
+            self.i1.c = i1.parent
+            i1.c = self.i1.parent
+        self.i2 = branch122.i
+        if i2 is not None:
+            self.i2.c = i2.parent
+            i2.c = self.i2.parent
+        self.o = and_gate2.o
         if o is not None:
             self.o.c = o.parent
             o.c = self.o.parent
@@ -301,6 +320,42 @@ class MultiSwitch:
                 o[j].c = self.o[j].parent
 
 
+class MultiBulbs:
+    def __init__(self, circuit, n, i=None, o=None):
+        branches = [Branch12(circuit=circuit) for j in range(n)]
+        self.bulbs = [Bulb(circuit=circuit,
+                           i=branches[j].o1,
+                           o=circuit.add_minus().i)
+                      for j in range(n)]
+        self.i = [branches[j].i for j in range(n)]
+        for j in range(len(self.i)):
+            if i is not None and len(i) > j and i[j] is not None:
+                self.i[j].c = i[j].parent
+                i[j].c = self.i[j].parent
+        self.o = [branches[j].o2 for j in range(n)]
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+
+
+class ManualSwitches:
+    def __init__(self, circuit, n, keys, we_key, o=None):
+        self.switches = [Switch(circuit=circuit,
+                                i=circuit.add_plus().o,
+                                key=keys[j])
+                         for j in range(n)]
+        self.we_switch = Switch(circuit=circuit, i=circuit.add_plus().o,
+                                key=we_key)
+        we = MultiSwitch(circuit=circuit, switch=self.we_switch.o,
+                         i=[self.switches[j].o for j in range(n)], n=n)
+        self.o = we.o
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+
+
 class DLatch:
     def __init__(self, circuit, i1=None, i2=None, o=None):
         branch121 = Branch12(circuit=circuit)
@@ -327,24 +382,131 @@ class DLatch:
 
 
 class Register:
-    def __init__(self, circuit, n, we=None, i=None, o=None):
-        we_branch = Branch1n(circuit=circuit, n=n)
-        dlatches = [DLatch(circuit=circuit, i2=we_branch.o[j])
+    def __init__(self, circuit, n, i=None, o=None, re=None, clk=None):
+        re_and = AND(circuit=circuit)
+        re_branch = Branch1n(circuit=circuit, i=[re_and.o], n=n)
+        dlatches = [DLatch(circuit=circuit, i2=re_branch.o[j])
                     for j in range(n)]
-        self.we = we_branch.i[0]
-        if we is not None:
-            self.we.c = we.parent
-            we.c = self.we.parent
+        mbulbs = MultiBulbs(circuit=circuit,
+                            i=[dlatches[j].o for j in range(n)], n=n)
+        self.bulbs = mbulbs.bulbs
         self.i = [dlatches[j].i1 for j in range(n)]
         for j in range(len(self.i)):
             if i is not None and len(i) > j and i[j] is not None:
                 self.i[j].c = i[j].parent
                 i[j].c = self.i[j].parent
-        self.o = [dlatches[j].o for j in range(n)]
+        self.o = mbulbs.o
         for j in range(len(self.o)):
             if o is not None and len(o) > j and o[j] is not None:
                 self.o[j].c = o[j].parent
                 o[j].c = self.o[j].parent
+        self.re = re_and.i1
+        if re is not None:
+            self.re.c = re.parent
+            re.c = self.re.parent
+        self.clk = re_and.i2
+        if clk is not None:
+            self.clk.c = clk.parent
+            clk.c = self.clk.parent
+
+
+class FullAdder:
+    def __init__(self, circuit, a=None, b=None, ci=None, s=None, co=None):
+        branch12a = Branch12(circuit=circuit)
+        branch12b = Branch12(circuit=circuit)
+        xor_gate1 = XOR(circuit=circuit, i1=branch12a.o1, i2=branch12b.o1)
+        branch12xor = Branch12(circuit=circuit, i=xor_gate1.o)
+        branch12c = Branch12(circuit=circuit)
+        xor_gate2 = XOR(circuit=circuit, i1=branch12xor.o1, i2=branch12c.o1)
+        and_gate1 = AND(circuit=circuit, i1=branch12a.o2, i2=branch12b.o2)
+        and_gate2 = AND(circuit=circuit, i1=branch12xor.o2, i2=branch12c.o2)
+        or_gate = OR(circuit=circuit, i1=and_gate1.o, i2=and_gate2.o)
+        self.a = branch12a.i
+        if a is not None:
+            self.a.c = a.parent
+            a.c = self.a.parent
+        self.b = branch12b.i
+        if b is not None:
+            self.b.c = b.parent
+            b.c = self.b.parent
+        self.ci = branch12c.i
+        if ci is not None:
+            self.ci.c = ci.parent
+            ci.c = self.ci.parent
+        self.s = xor_gate2.o
+        if s is not None:
+            self.s.c = s.parent
+            s.c = self.s.parent
+        self.co = or_gate.o
+        if co is not None:
+            self.co.c = co.parent
+            co.c = self.co.parent
+
+
+class nBitAdder:
+    def __init__(self, circuit, n, a=None, b=None, ci=None, s=None, co=None):
+        adders = []
+        for j in range(n):
+            adder = FullAdder(circuit=circuit,
+                              ci=None if j == 0 else adders[-1].co)
+            adders.append(adder)
+        self.a = [adders[j].a for j in range(n)]
+        for j in range(len(self.a)):
+            if a is not None and len(a) > j and a[j] is not None:
+                self.a[j].c = a[j].parent
+                a[j].c = self.a[j].parent
+        self.b = [adders[j].b for j in range(n)]
+        for j in range(len(self.b)):
+            if b is not None and len(b) > j and b[j] is not None:
+                self.b[j].c = b[j].parent
+                b[j].c = self.b[j].parent
+        self.ci = adders[0].ci
+        if ci is not None:
+            self.ci.c = ci.parent
+            ci.c = self.ci.parent
+        self.s = [adders[j].s for j in range(n)]
+        for j in range(len(self.s)):
+            if s is not None and len(s) > j and s[j] is not None:
+                self.s[j].c = s[j].parent
+                s[j].c = self.s[j].parent
+        self.co = adders[-1].co
+        if co is not None:
+            self.co.c = co.parent
+            co.c = self.co.parent
+
+
+class ALU:
+    def __init__(self, circuit, n, a=None, b=None, s=None, we=None, su=None):
+        su_branches = Branch1n(circuit=circuit, n=n+1)
+        su_xors = [XOR(circuit=circuit, i1=su_branches.o[j]) for j in range(n)]
+        adder = nBitAdder(circuit=circuit, b=[su_xors[j].o for j in range(n)],
+                          ci=su_branches.o[-1], n=n)
+        mbulbs = MultiBulbs(circuit=circuit, i=adder.s, n=n)
+        self.bulbs = mbulbs.bulbs
+        we_mswitch = MultiSwitch(circuit=circuit, i=mbulbs.o, n=n)
+        self.a = adder.a
+        for j in range(len(self.a)):
+            if a is not None and len(a) > j and a[j] is not None:
+                self.a[j].c = a[j].parent
+                a[j].c = self.a[j].parent
+        self.b = [su_xors[j].i2 for j in range(n)]
+        for j in range(len(self.b)):
+            if b is not None and len(b) > j and b[j] is not None:
+                self.b[j].c = b[j].parent
+                b[j].c = self.b[j].parent
+        self.s = we_mswitch.o
+        for j in range(len(self.s)):
+            if s is not None and len(s) > j and s[j] is not None:
+                self.s[j].c = s[j].parent
+                s[j].c = self.s[j].parent
+        self.we = we_mswitch.switch
+        if we is not None:
+            self.we.c = we.parent
+            we.c = self.we.parent
+        self.su = su_branches.i[0]
+        if su is not None:
+            self.su.c = su.parent
+            su.c = self.su.parent
 
 
 class Clock:
@@ -353,10 +515,8 @@ class Clock:
         self.speed = 0.5 # in Hertz
         self.delta = 0.5 # in Hertz
         self.t = time.time()
-        plus1 = Plus(circuit=circuit)
-        plus2 = Plus(circuit=circuit)
-        self.switch = Switch(circuit=circuit, i=plus1.o)
-        self.edge_switch = Switch(circuit=circuit, i=plus2.o)
+        self.switch = Switch(circuit=circuit, i=circuit.add_plus().o)
+        self.edge_switch = Switch(circuit=circuit, i=circuit.add_plus().o)
         self.o1 = self.switch.o
         if o1 is not None:
             self.o1.c = o1.parent
@@ -416,7 +576,7 @@ class Bus:
         return [branch.i2 for branch in branches]
 
 
-# Circuit and display
+# Circuit
 
 
 class Circuit:
@@ -427,6 +587,14 @@ class Circuit:
     def initialize(self):
         for p in self.plusses:
             p.update_right(None, None)
+
+    def add_plus(self):
+        plus = Plus(circuit=self)
+        self.plusses.append(plus)
+        return plus
+
+    def add_minus(self):
+        return Minus(circuit=self)
 
     def update(self, key):
         return sum(c.update(key) for c in self.interactive) > 0

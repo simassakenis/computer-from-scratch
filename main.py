@@ -1,8 +1,9 @@
 import graphics
 from components import (
     Branch12, Branch21, Plus, Minus, Switch, Bulb, Transistor,
-    NOT, AND, OR, Branch1n, MultiSwitch, DLatch, Register, Clock, Bus,
-    Circuit
+    NOT, AND, OR, XOR, Branch1n, MultiSwitch, MultiBulbs, ManualSwitches,
+    DLatch, Register, FullAdder, nBitAdder, ALU,
+    Clock, Bus, Circuit
 )
 from display import Display, green, blue, yellow
 
@@ -68,13 +69,8 @@ if __name__ == '__main__':
     # minus = Minus(circuit=circuit)
     # jungiklis1 = Switch(circuit=circuit, i=plus1.o, key='a')
     # jungiklis2 = Switch(circuit=circuit, i=plus2.o, key='s')
-    # branch121 = Branch12(circuit=circuit, i=jungiklis1.o)
-    # branch122 = Branch12(circuit=circuit, i=jungiklis2.o)
-    # and_gate = AND(circuit=circuit, i1=branch121.o1, i2=branch122.o1)
-    # not_gate = NOT(circuit=circuit, i=and_gate.o)
-    # or_gate = OR(circuit=circuit, i1=branch121.o2, i2=branch122.o2)
-    # and_gate2 = AND(circuit=circuit, i1=not_gate.o, i2=or_gate.o)
-    # lempute = Bulb(circuit=circuit, i=and_gate2.o, o=minus.i)
+    # or_gate = XOR(circuit=circuit, i1=jungiklis1.o, i2=jungiklis2.o)
+    # lempute = Bulb(circuit=circuit, i=or_gate.o, o=minus.i)
     # circuit.initialize()
     # display = Display()
     # display.draw_box([jungiklis1, jungiklis2, lempute], ['I1', 'I2', 'O'],
@@ -133,80 +129,173 @@ if __name__ == '__main__':
     # display = Display()
     # display.draw_box([lempute], ['CLK'], [blue], 'Clock')
 
-    # 8-bit registers demo
+    # # 8-bit registers demo
+    # n = 8
+
+    # circuit = Circuit()
+    # clock = Clock(circuit=circuit)
+    # clock_branch = Branch12(circuit=circuit, i=clock.o2)
+    # bus = Bus(circuit=circuit, n=n)
+
+    # manual_switches = ManualSwitches(
+    #     circuit=circuit, o=bus.add_write(),
+    #     keys=['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'], we_key='e', n=n
+    # )
+
+    # regA_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='r')
+    # regA = Register(circuit=circuit, i=bus.add_read(), re=regA_re_switch.o,
+    #                 clk=clock_branch.o1, n=n)
+    # regA_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
+    # regA_we = MultiSwitch(circuit=circuit, switch=regA_we_switch.o,
+    #                       i=regA.o, o=bus.add_write(), n=n)
+
+    # regB_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='y')
+    # regB = Register(circuit=circuit, i=bus.add_read(), re=regB_re_switch.o,
+    #                 clk=clock_branch.o2, n=n)
+    # regB_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='t')
+    # regB_we = MultiSwitch(circuit=circuit, switch=regB_we_switch.o,
+    #                       i=regB.o, o=bus.add_write(), n=n)
+
+    # circuit.initialize()
+    # display = Display()
+    # display.draw_box(
+    #     components=[manual_switches.we_switch] + manual_switches.switches,
+    #     labels=['WE'] + [f'I{j+1}' for j in range(n)],
+    #     colors=[yellow] + [green for _ in range(n)],
+    #     title='Manual inputs', yoffset=-180, sep_after=[1]
+    # )
+    # display.draw_box(
+    #     components=bus.bulbs, labels=[f'B{j+1}' for j in range(n)],
+    #     colors=[green for _ in range(n)], title='Bus', yoffset=-60
+    # )
+    # display.draw_box(
+    #     components=[clock.switch, regA_re_switch, regA_we_switch] + regA.bulbs,
+    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
+    #     colors=[blue, yellow, yellow] + [green for _ in range(n)],
+    #     title='Register A', yoffset=60, sep_after=[3]
+    # )
+    # display.draw_box(
+    #     components=[clock.switch, regB_re_switch, regB_we_switch] + regB.bulbs,
+    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
+    #     colors=[blue, yellow, yellow] + [green for _ in range(n)],
+    #     title='Register B', yoffset=180, sep_after=[3]
+    # )
+
+    # # 8-bit adder demo
+    # n = 8
+    # circuit = Circuit()
+
+    # manualA_switches = ManualSwitches(
+    #     circuit=circuit, keys=['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'],
+    #     we_key='e', n=n
+    # )
+
+    # manualB_switches = ManualSwitches(
+    #     circuit=circuit, keys=['z', 'x', 'c', 'v', 'b', 'n', 'm', 'comma'],
+    #     we_key='r', n=n
+    # )
+
+    # ci_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='t')
+    # nbit_adder = nBitAdder(circuit=circuit,
+    #                        a=manualA_switches.o,
+    #                        b=manualB_switches.o,
+    #                        ci=ci_switch.o, n=n)
+    # sum_bulbs = [Bulb(circuit=circuit, i=nbit_adder.s[j]) for j in range(n)]
+    # sum_minuses = [Minus(circuit=circuit, i=sum_bulbs[j].o) for j in range(n)]
+    # co_bulb = Bulb(circuit=circuit, i=nbit_adder.co)
+    # co_minus = Minus(circuit=circuit, i=co_bulb.o)
+
+    # circuit.initialize()
+    # display = Display()
+    # display.draw_box(
+    #     components=[manualA_switches.we_switch] + manualA_switches.switches,
+    #     labels=['WE'] + [f'I{j+1}' for j in range(n)],
+    #     colors=[yellow] + [green for _ in range(n)],
+    #     title='Manual inputs A', yoffset=-180, sep_after=[1]
+    # )
+    # display.draw_box(
+    #     components=[manualB_switches.we_switch] + manualB_switches.switches,
+    #     labels=['WE'] + [f'I{j+1}' for j in range(n)],
+    #     colors=[yellow] + [green for _ in range(n)],
+    #     title='Manual inputs B', yoffset=-60, sep_after=[1]
+    # )
+    # display.draw_box(
+    #     components=[ci_switch] + sum_bulbs + [co_bulb],
+    #     labels=['CI'] + [f'S{j+1}' for j in range(n)] + ['CO'],
+    #     colors=[green] * (n+2), title='8-bit adder',
+    #     yoffset=60, sep_after=[1, 9]
+    # )
+
+    # 8-bit ALU demo
     n = 8
-    keys = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k']
 
     circuit = Circuit()
     clock = Clock(circuit=circuit)
     clock_branch = Branch12(circuit=circuit, i=clock.o2)
     bus = Bus(circuit=circuit, n=n)
-    bus_write_manual = bus.add_write()
 
-    manual_plus = Plus(circuit=circuit)
-    manual_enable = Switch(circuit=circuit, i=manual_plus.o, key='e')
-    manual_branch = Branch1n(circuit=circuit, i=[manual_enable.o], n=n)
-    manual_switches = [Switch(circuit=circuit,
-                              i=manual_branch.o[j],
-                              o=bus_write_manual[j],
-                              key=keys[j])
-                       for j in range(n)]
-
-    regA_re_plus = Plus(circuit=circuit)
-    regA_re_switch = Switch(circuit=circuit, i=regA_re_plus.o, key='r')
-    regA_re_and = AND(circuit=circuit, i1=clock_branch.o1, i2=regA_re_switch.o)
-    regA = Register(circuit=circuit, we=regA_re_and.o, i=bus.add_read(), n=n)
-    regA_out_branches = [Branch12(circuit=circuit, i=regA.o[j])
-                         for j in range(n)]
-    regA_bulbs = [Bulb(circuit=circuit, i=regA_out_branches[j].o1)
-                  for j in range(n)]
-    regA_minuses = [Minus(circuit=circuit, i=regA_bulbs[j].o) for j in range(n)]
-    regA_we_plus = Plus(circuit=circuit)
-    regA_we_switch = Switch(circuit=circuit, i=regA_we_plus.o, key='w')
-    regA_we_mswitch = MultiSwitch(
-        circuit=circuit, switch=regA_we_switch.o,
-        i=[regA_out_branches[j].o2 for j in range(n)], o=bus.add_write(), n=n
+    manual_switches = ManualSwitches(
+        circuit=circuit, o=bus.add_write(),
+        keys=['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'], we_key='e', n=n
     )
 
-    regB_re_plus = Plus(circuit=circuit)
-    regB_re_switch = Switch(circuit=circuit, i=regB_re_plus.o, key='y')
-    regB_re_and = AND(circuit=circuit, i1=clock_branch.o2, i2=regB_re_switch.o)
-    regB = Register(circuit=circuit, we=regB_re_and.o, i=bus.add_read(), n=n)
-    regB_out_branches = [Branch12(circuit=circuit, i=regB.o[j])
-                         for j in range(n)]
-    regB_bulbs = [Bulb(circuit=circuit, i=regB_out_branches[j].o1)
-                  for j in range(n)]
-    regB_minuses = [Minus(circuit=circuit, i=regB_bulbs[j].o) for j in range(n)]
-    regB_we_plus = Plus(circuit=circuit)
-    regB_we_switch = Switch(circuit=circuit, i=regB_we_plus.o, key='t')
-    regB_we_mswitch = MultiSwitch(
-        circuit=circuit, switch=regB_we_switch.o,
-        i=[regB_out_branches[j].o2 for j in range(n)], o=bus.add_write(), n=n
-    )
+    regA_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='r')
+    regA = Register(circuit=circuit, i=bus.add_read(), re=regA_re_switch.o,
+                    clk=clock_branch.o1, n=n)
+    regA_branches = [Branch12(circuit=circuit, i=regA.o[j]) for j in range(n)]
+    regA_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
+    regA_we = MultiSwitch(circuit=circuit, switch=regA_we_switch.o,
+                          i=[regA_branches[j].o1 for j in range(n)],
+                          o=bus.add_write(), n=n)
+
+    regB_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='y')
+    regB = Register(circuit=circuit, i=bus.add_read(), re=regB_re_switch.o,
+                    clk=clock_branch.o2, n=n)
+    regB_branches = [Branch12(circuit=circuit, i=regB.o[j]) for j in range(n)]
+    regB_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='t')
+    regB_we = MultiSwitch(circuit=circuit, switch=regB_we_switch.o,
+                          i=[regB_branches[j].o1 for j in range(n)],
+                          o=bus.add_write(), n=n)
+
+    alu_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='o')
+    alu_su_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='p')
+    alu = ALU(circuit=circuit,
+              a=[regA_branches[j].o2 for j in range(n)],
+              b=[regB_branches[j].o2 for j in range(n)],
+              s=bus.add_write(),
+              we=alu_we_switch.o,
+              su=alu_su_switch.o,
+              n=n)
 
     circuit.initialize()
     display = Display()
     display.draw_box(
-        components=[manual_enable] + manual_switches,
+        components=[manual_switches.we_switch] + manual_switches.switches,
         labels=['WE'] + [f'I{j+1}' for j in range(n)],
         colors=[yellow] + [green for _ in range(n)],
-        title='Manual inputs', yoffset=-180, sep_after=[1]
+        title='Manual inputs', yoffset=-240, sep_after=[1]
     )
     display.draw_box(
         components=bus.bulbs, labels=[f'B{j+1}' for j in range(n)],
-        colors=[green for _ in range(n)], title='Bus', yoffset=-60
+        colors=[green for _ in range(n)], title='Bus', yoffset=-120
     )
     display.draw_box(
-        components=[clock.switch, regA_re_switch, regA_we_switch] + regA_bulbs,
+        components=[clock.switch, regA_re_switch, regA_we_switch] + regA.bulbs,
         labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
         colors=[blue, yellow, yellow] + [green for _ in range(n)],
-        title='Register A', yoffset=60, sep_after=[3]
+        title='Register A', yoffset=0, sep_after=[3]
     )
     display.draw_box(
-        components=[clock.switch, regB_re_switch, regB_we_switch] + regB_bulbs,
+        components=[clock.switch, regB_re_switch, regB_we_switch] + regB.bulbs,
         labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
         colors=[blue, yellow, yellow] + [green for _ in range(n)],
-        title='Register B', yoffset=180, sep_after=[3]
+        title='Register B', yoffset=120, sep_after=[3]
+    )
+    display.draw_box(
+        components=[alu_we_switch, alu_su_switch] + alu.bulbs,
+        labels=['WE', 'SU'] + [f'S{j+1}' for j in range(n)],
+        colors=[yellow, yellow] + [green for _ in range(n)],
+        title='ALU', yoffset=240, sep_after=[2]
     )
 
     while True:
