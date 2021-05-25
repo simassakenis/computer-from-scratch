@@ -231,17 +231,18 @@ if __name__ == '__main__':
 
     circuit = Circuit()
     clock = Clock(circuit=circuit)
-    clock_branch = Branch12(circuit=circuit, i=clock.o2)
+    clock_branch = Branch1n(circuit=circuit, i=[clock.o2], n=3)
     bus = Bus(circuit=circuit, n=n)
 
     manual_switches = ManualSwitches(
         circuit=circuit, o=bus.add_write(),
-        keys=['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'], we_key='e', n=n
+        keys=['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'][::-1],
+        we_key='e', n=n
     )
 
     regA_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='r')
     regA = Register(circuit=circuit, i=bus.add_read(), re=regA_re_switch.o,
-                    clk=clock_branch.o1, n=n)
+                    clk=clock_branch.o[0], n=n)
     regA_branches = [Branch12(circuit=circuit, i=regA.o[j]) for j in range(n)]
     regA_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
     regA_we = MultiSwitch(circuit=circuit, switch=regA_we_switch.o,
@@ -250,11 +251,20 @@ if __name__ == '__main__':
 
     regB_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='y')
     regB = Register(circuit=circuit, i=bus.add_read(), re=regB_re_switch.o,
-                    clk=clock_branch.o2, n=n)
+                    clk=clock_branch.o[1], n=n)
     regB_branches = [Branch12(circuit=circuit, i=regB.o[j]) for j in range(n)]
     regB_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='t')
     regB_we = MultiSwitch(circuit=circuit, switch=regB_we_switch.o,
                           i=[regB_branches[j].o1 for j in range(n)],
+                          o=bus.add_write(), n=n)
+
+    regC_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='i')
+    regC = Register(circuit=circuit, i=bus.add_read(), re=regC_re_switch.o,
+                    clk=clock_branch.o[2], n=n)
+    regC_branches = [Branch12(circuit=circuit, i=regC.o[j]) for j in range(n)]
+    regC_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='u')
+    regC_we = MultiSwitch(circuit=circuit, switch=regC_we_switch.o,
+                          i=[regC_branches[j].o1 for j in range(n)],
                           o=bus.add_write(), n=n)
 
     alu_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='o')
@@ -270,32 +280,41 @@ if __name__ == '__main__':
     circuit.initialize()
     display = Display()
     display.draw_box(
-        components=[manual_switches.we_switch] + manual_switches.switches,
-        labels=['WE'] + [f'I{j+1}' for j in range(n)],
+        components=[manual_switches.we_switch] + manual_switches.switches[::-1],
+        labels=['WE'] + [f'I{j+1}' for j in range(n)][::-1],
         colors=[yellow] + [green for _ in range(n)],
-        title='Manual inputs', yoffset=-240, sep_after=[1]
+        title='Manual inputs', yoffset=-300, sep_after=[1]
     )
     display.draw_box(
-        components=bus.bulbs, labels=[f'B{j+1}' for j in range(n)],
-        colors=[green for _ in range(n)], title='Bus', yoffset=-120
+        components=bus.bulbs[::-1], labels=[f'B{j+1}' for j in range(n)][::-1],
+        colors=[green for _ in range(n)], title='Bus', yoffset=-180
     )
     display.draw_box(
-        components=[clock.switch, regA_re_switch, regA_we_switch] + regA.bulbs,
+        components=([clock.switch, regA_re_switch, regA_we_switch]
+                    + regA.bulbs[::-1]),
+        labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)][::-1],
+        colors=[blue, yellow, yellow] + [green for _ in range(n)],
+        title='Register A', yoffset=-60, sep_after=[3]
+    )
+    display.draw_box(
+        components=([clock.switch, regB_re_switch, regB_we_switch]
+                    + regB.bulbs[::-1]),
         labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
         colors=[blue, yellow, yellow] + [green for _ in range(n)],
-        title='Register A', yoffset=0, sep_after=[3]
+        title='Register B', yoffset=60, sep_after=[3]
     )
     display.draw_box(
-        components=[clock.switch, regB_re_switch, regB_we_switch] + regB.bulbs,
+        components=([clock.switch, regC_re_switch, regC_we_switch]
+                    + regC.bulbs[::-1]),
         labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
         colors=[blue, yellow, yellow] + [green for _ in range(n)],
-        title='Register B', yoffset=120, sep_after=[3]
+        title='Register C', yoffset=180, sep_after=[3]
     )
     display.draw_box(
-        components=[alu_we_switch, alu_su_switch] + alu.bulbs,
-        labels=['WE', 'SU'] + [f'S{j+1}' for j in range(n)],
+        components=[alu_we_switch, alu_su_switch] + alu.bulbs[::-1],
+        labels=['WE', 'SU'] + [f'S{j+1}' for j in range(n)][::-1],
         colors=[yellow, yellow] + [green for _ in range(n)],
-        title='ALU', yoffset=240, sep_after=[2]
+        title='ALU', yoffset=300, sep_after=[2]
     )
 
     while True:
