@@ -2,7 +2,7 @@ import graphics
 from components import (
     Branch12, Branch21, Plus, Minus, Switch, Bulb, Transistor,
     NOT, AND, OR, XOR, Branch1n, MultiSwitch, MultiBulbs, ManualSwitches,
-    DLatch, Register, Decoder, FullAdder, nBitAdder, ALU,
+    DLatch, Register, Decoder, SRAM, FullAdder, nBitAdder, ALU,
     Clock, Bus, Circuit
 )
 from display import Display, green, blue, yellow
@@ -317,33 +317,79 @@ if __name__ == '__main__':
     #     title='ALU', yoffset=300, sep_after=[2]
     # )
 
-    # Decoder demo
+    # # Decoder demo
+    # n = 16
+    # m = 4
+    # circuit = Circuit()
+
+    # manual_switches = ManualSwitches(
+    #         circuit=circuit, keys=['u', 'i', 'o', 'p'][::-1],
+    #     we_key='e', n=m
+    # )
+    # decoder = Decoder(circuit=circuit, i=manual_switches.o, n=n)
+    # mbulbs = MultiBulbs(circuit=circuit, i=decoder.o, n=n)
+
+    # circuit.initialize()
+    # display = Display()
+    # display.draw_box(
+    #     components=[manual_switches.we_switch] + manual_switches.switches[::-1],
+    #     labels=['WE'] + [f'I{j+1}' for j in range(m)][::-1],
+    #     colors=[yellow] + [green for _ in range(m)],
+    #     title='Manual inputs', yoffset=-180, sep_after=[1]
+    # )
+    # display.draw_box(
+    #     components=mbulbs.bulbs, labels=[f'D{j}' for j in range(n)],
+    #     colors=[green] * n, title='Decoder', yoffset=60
+    # )
+
+    # SRAM demo
     n = 16
     m = 4
     circuit = Circuit()
 
-    manual_switches = ManualSwitches(
-            circuit=circuit, keys=['a', 's', 'd', 'f'][::-1],
+    manualA_switches = ManualSwitches(
+        circuit=circuit, keys=['u', 'i', 'o', 'p'][::-1],
         we_key='e', n=m
     )
-    e_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='t')
-    decoder = Decoder(circuit=circuit, i=manual_switches.o,
-                      e=e_switch.o, n=n)
-    mbulbs = MultiBulbs(circuit=circuit, i=decoder.o, n=n)
+    manualD_switches = ManualSwitches(
+        circuit=circuit, keys=['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'][::-1],
+        we_key='y', n=8
+    )
+
+    sram_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='r')
+    sram_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
+    sram = SRAM(circuit=circuit,
+                a=manualA_switches.o,
+                i=manualD_switches.o,
+                re=sram_re_switch.o,
+                we=sram_we_switch.o,
+                nbytes=n)
 
     circuit.initialize()
     display = Display()
     display.draw_box(
-        components=[manual_switches.we_switch] + manual_switches.switches[::-1],
-        labels=['WE'] + [f'I{j+1}' for j in range(m)][::-1],
-        colors=[yellow] + [green for _ in range(m)],
-        title='Manual inputs', yoffset=-180, sep_after=[1]
+        components=([manualD_switches.we_switch]
+                    + manualD_switches.switches[::-1]),
+        labels=['WE'] + [f'I{j+1}' for j in range(8)][::-1],
+        colors=[yellow] + [green for _ in range(8)],
+        title='Manual data inputs', yoffset=-180, sep_after=[1]
     )
     display.draw_box(
-        components=[e_switch] + mbulbs.bulbs,
-        labels=['E'] + [f'D{j}' for j in range(n)],
-        colors=[yellow] + [green] * n, title='Decoder',
-        yoffset=60, sep_after=[1]
+        components=([manualA_switches.we_switch]
+                    + manualA_switches.switches[::-1]),
+        labels=['WE'] + [f'I{j+1}' for j in range(m)][::-1],
+        colors=[yellow] + [green for _ in range(m)],
+        title='Manual address inputs', yoffset=-60, sep_after=[1]
+    )
+    display.draw_box(
+        components=sram.addr_bulbs, labels=[f'D{j}' for j in range(n)],
+        colors=[green] * n, title='Address decoder', yoffset=60
+    )
+    display.draw_box(
+        components=[sram_re_switch, sram_we_switch] + sram.bulbs[::-1],
+        labels=['RE', 'WE'] + [f'R{j+1}' for j in range(8)][::-1],
+        colors=[yellow, yellow] + [green] * 8, title='SRAM',
+        yoffset=180, sep_after=[2]
     )
 
 

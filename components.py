@@ -300,6 +300,26 @@ class Branch1n:
                 o[j].c = self.o[j].parent
 
 
+class Branchn1:
+    def __init__(self, circuit, n, i=None, o=None):
+        branch = Branch21(circuit=circuit)
+        self.i = [branch.i1]
+        self.o = [branch.o]
+        assert n >= 2
+        for _ in range(n - 2):
+            branch = Branch21(circuit=circuit, o=branch.i2)
+            self.i.append(branch.i1)
+        self.o.append(branch.i2)
+        for j in range(len(self.i)):
+            if i is not None and len(i) > j and i[j] is not None:
+                self.i[j].c = i[j].parent
+                i[j].c = self.i[j].parent
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+
+
 class MultiSwitch:
     def __init__(self, circuit, n, switch=None, i=None, o=None):
         branch = Branch1n(circuit=circuit, n=n)
@@ -412,45 +432,95 @@ class Register:
 
 
 class Decoder:
-    def __init__(self, circuit, n, i=None, o=None, e=None):
+    def __init__(self, circuit, n, i=None, o=None):
         m = int(math.log2(n))
         assert n >= 2 and m == math.log2(n)
         if m == 1:
             branch = Branch12(circuit=circuit)
             not_gate = NOT(circuit=circuit, i=branch.o1)
-            mswitch = MultiSwitch(circuit=circuit,
-                                  i=[not_gate.o, branch.o2], n=n)
             self.i = [branch.i]
-            for j in range(len(self.i)):
-                if i is not None and len(i) > j and i[j] is not None:
-                    self.i[j].c = i[j].parent
-                    i[j].c = self.i[j].parent
+            self.o = [not_gate.o, branch.o2]
         else:
             branches = [Branch12(circuit=circuit) for _ in range(m)]
             not_gate = NOT(circuit=circuit, i=branches[-1].o1)
             decoder_low = Decoder(circuit=circuit,
                                   i=[branches[j].o1 for j in range(m-1)],
-                                  e=not_gate.o, n=n//2)
+                                  n=n//2)
+            mswitch_low = MultiSwitch(circuit=circuit, i=decoder_low.o,
+                                      switch=not_gate.o, n=n//2)
             decoder_high = Decoder(circuit=circuit,
                                    i=[branches[j].o2 for j in range(m-1)],
-                                   e=branches[-1].o2, n=n//2)
-            mswitch = MultiSwitch(circuit=circuit,
-                                  i=decoder_low.o + decoder_high.o, n=n)
+                                   n=n//2)
+            mswitch_high = MultiSwitch(circuit=circuit, i=decoder_high.o,
+                                       switch=branches[-1].o2, n=n//2)
             self.i = [branches[j].i for j in range(m)]
-            for j in range(len(self.i)):
-                if i is not None and len(i) > j and i[j] is not None:
-                    self.i[j].c = i[j].parent
-                    i[j].c = self.i[j].parent
-        self.o = mswitch.o
+            self.o = mswitch_low.o + mswitch_high.o
+        for j in range(len(self.i)):
+            if i is not None and len(i) > j and i[j] is not None:
+                self.i[j].c = i[j].parent
+                i[j].c = self.i[j].parent
         for j in range(len(self.o)):
             if o is not None and len(o) > j and o[j] is not None:
                 self.o[j].c = o[j].parent
                 o[j].c = self.o[j].parent
-        self.e = mswitch.switch
-        if e is not None:
-            self.e.c = e.parent
-            e.c = self.e.parent
 
+
+
+class SRAM:
+    def __init__(self, circuit, nbytes, a=None, i=None, o=None,
+                 re=None, we=None):
+        decoder = Decoder(circuit=circuit, n=nbytes)
+        a_mbulbs = MultiBulbs(circuit=circuit, i=decoder.o, n=nbytes)
+        self.addr_bulbs = a_mbulbs.bulbs
+        a_branches = [Branch12(circuit=circuit, i=a_mbulbs.o[k])
+                      for k in range(nbytes)]
+        re_mswitch = MultiSwitch(circuit=circuit,
+                                 i=[a_branches[k].o1 for k in range(nbytes)],
+                                 n=nbytes)
+        re_branches = [Branch1n(circuit=circuit, i=[re_mswitch.o[k]], n=8)
+                       for k in range(nbytes)]
+        dlatches = [[DLatch(circuit=circuit, i2=re_branches[k].o[j])
+                     for j in range(8)]
+                    for k in range(nbytes)]
+        i_branches = [Branch1n(circuit=circuit,
+                               o=[dlatches[k][j].i1 for k in range(nbytes)],
+                               n=nbytes)
+                      for j in range(8)]
+        o_mswitches = [MultiSwitch(circuit=circuit,
+                                   i=[dlatches[k][j].o for j in range(8)],
+                                   switch=a_branches[k].o2, n=8)
+                       for k in range(nbytes)]
+        o_branches = [Branchn1(circuit=circuit,
+                               i=[o_mswitches[k].o[j] for k in range(nbytes)],
+                               n=nbytes)
+                      for j in range(8)]
+        o_mbulbs = MultiBulbs(circuit=circuit,
+                              i=[o_branches[j].o[0] for j in range(8)], n=8)
+        self.bulbs = o_mbulbs.bulbs
+        we_mswitch = MultiSwitch(circuit=circuit, i=o_mbulbs.o, n=8)
+        self.a = decoder.i
+        for j in range(len(self.a)):
+            if a is not None and len(a) > j and a[j] is not None:
+                self.a[j].c = a[j].parent
+                a[j].c = self.a[j].parent
+        self.i = [i_branches[j].i[0] for j in range(8)]
+        for j in range(len(self.i)):
+            if i is not None and len(i) > j and i[j] is not None:
+                self.i[j].c = i[j].parent
+                i[j].c = self.i[j].parent
+        self.o = o_mbulbs.o
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+        self.re = re_mswitch.switch
+        if re is not None:
+            self.re.c = re.parent
+            re.c = self.re.parent
+        self.we = we_mswitch.switch
+        if we is not None:
+            self.we.c = we.parent
+            we.c = self.we.parent
 
 
 class FullAdder:
