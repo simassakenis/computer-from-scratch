@@ -1,4 +1,5 @@
 import time
+import math
 
 
 # Lowest-level components
@@ -408,6 +409,48 @@ class Register:
         if clk is not None:
             self.clk.c = clk.parent
             clk.c = self.clk.parent
+
+
+class Decoder:
+    def __init__(self, circuit, n, i=None, o=None, e=None):
+        m = int(math.log2(n))
+        assert n >= 2 and m == math.log2(n)
+        if m == 1:
+            branch = Branch12(circuit=circuit)
+            not_gate = NOT(circuit=circuit, i=branch.o1)
+            mswitch = MultiSwitch(circuit=circuit,
+                                  i=[not_gate.o, branch.o2], n=n)
+            self.i = [branch.i]
+            for j in range(len(self.i)):
+                if i is not None and len(i) > j and i[j] is not None:
+                    self.i[j].c = i[j].parent
+                    i[j].c = self.i[j].parent
+        else:
+            branches = [Branch12(circuit=circuit) for _ in range(m)]
+            not_gate = NOT(circuit=circuit, i=branches[-1].o1)
+            decoder_low = Decoder(circuit=circuit,
+                                  i=[branches[j].o1 for j in range(m-1)],
+                                  e=not_gate.o, n=n//2)
+            decoder_high = Decoder(circuit=circuit,
+                                   i=[branches[j].o2 for j in range(m-1)],
+                                   e=branches[-1].o2, n=n//2)
+            mswitch = MultiSwitch(circuit=circuit,
+                                  i=decoder_low.o + decoder_high.o, n=n)
+            self.i = [branches[j].i for j in range(m)]
+            for j in range(len(self.i)):
+                if i is not None and len(i) > j and i[j] is not None:
+                    self.i[j].c = i[j].parent
+                    i[j].c = self.i[j].parent
+        self.o = mswitch.o
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+        self.e = mswitch.switch
+        if e is not None:
+            self.e.c = e.parent
+            e.c = self.e.parent
+
 
 
 class FullAdder:
