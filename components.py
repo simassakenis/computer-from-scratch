@@ -469,10 +469,12 @@ class Decoder:
 class SRAM:
     def __init__(self, circuit, nbytes, a=None, i=None, o=None,
                  re=None, we=None):
-        decoder = Decoder(circuit=circuit, n=nbytes)
-        a_mbulbs = MultiBulbs(circuit=circuit, i=decoder.o, n=nbytes)
-        self.addr_bulbs = a_mbulbs.bulbs
-        a_branches = [Branch12(circuit=circuit, i=a_mbulbs.o[k])
+        addr_bulbs = MultiBulbs(circuit=circuit, n=int(math.log2(nbytes)))
+        self.addr_bulbs = addr_bulbs.bulbs
+        decoder = Decoder(circuit=circuit, i=addr_bulbs.o, n=nbytes)
+        dec_mbulbs = MultiBulbs(circuit=circuit, i=decoder.o, n=nbytes)
+        self.dec_bulbs = dec_mbulbs.bulbs
+        a_branches = [Branch12(circuit=circuit, i=dec_mbulbs.o[k])
                       for k in range(nbytes)]
         re_mswitch = MultiSwitch(circuit=circuit,
                                  i=[a_branches[k].o1 for k in range(nbytes)],
@@ -498,7 +500,7 @@ class SRAM:
                               i=[o_branches[j].o[0] for j in range(8)], n=8)
         self.bulbs = o_mbulbs.bulbs
         we_mswitch = MultiSwitch(circuit=circuit, i=o_mbulbs.o, n=8)
-        self.a = decoder.i
+        self.a = addr_bulbs.i
         for j in range(len(self.a)):
             if a is not None and len(a) > j and a[j] is not None:
                 self.a[j].c = a[j].parent
@@ -508,7 +510,7 @@ class SRAM:
             if i is not None and len(i) > j and i[j] is not None:
                 self.i[j].c = i[j].parent
                 i[j].c = self.i[j].parent
-        self.o = o_mbulbs.o
+        self.o = we_mswitch.o
         for j in range(len(self.o)):
             if o is not None and len(o) > j and o[j] is not None:
                 self.o[j].c = o[j].parent
@@ -521,6 +523,35 @@ class SRAM:
         if we is not None:
             self.we.c = we.parent
             we.c = self.we.parent
+
+
+class Selector:
+    def __init__(self, circuit, n, a=None, b=None, o=None, s=None):
+        branch_s = Branch1n(circuit=circuit, n=2*n)
+        nots_s = [NOT(circuit=circuit, i=branch_s.o[j]) for j in range(n, 2*n)]
+        ands_a = [AND(circuit=circuit, i2=branch_s.o[j]) for j in range(n)]
+        ands_b = [AND(circuit=circuit, i2=nots_s[j].o) for j in range(n)]
+        ors = [OR(circuit=circuit, i1=ands_a[j].o, i2=ands_b[j].o)
+               for j in range(n)]
+        self.a = [ands_a[j].i1 for j in range(n)]
+        for j in range(len(self.a)):
+            if a is not None and len(a) > j and a[j] is not None:
+                self.a[j].c = a[j].parent
+                a[j].c = self.a[j].parent
+        self.b = [ands_b[j].i1 for j in range(n)]
+        for j in range(len(self.b)):
+            if b is not None and len(b) > j and b[j] is not None:
+                self.b[j].c = b[j].parent
+                b[j].c = self.b[j].parent
+        self.o = [ors[j].o for j in range(n)]
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+        self.s = branch_s.i[0]
+        if s is not None:
+            self.s.c = s.parent
+            s.c = self.s.parent
 
 
 class FullAdder:
