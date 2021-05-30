@@ -442,25 +442,30 @@ if __name__ == '__main__':
     n = 4
     circuit = Circuit()
     clock = Clock(circuit=circuit)
+    bus = Bus(circuit=circuit, n=8)
     manualJ_switches = ManualSwitches(
-        circuit=circuit, keys=['g', 'h', 'j', 'k'][::-1],
-        we_key='e', n=n
+        circuit=circuit, keys=['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'][::-1],
+        o=bus.add_write(), we_key='e', n=8
     )
     ce_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='u')
     je_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='i')
     co_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='o')
     counter = BinaryCounter(circuit=circuit, clk=clock.o1,
-                            i=manualJ_switches.o, ce=ce_switch.o,
-                            je=je_switch.o, co=co_switch.o, n=n)
+                            i=bus.add_read(), o=bus.add_write(),
+                            ce=ce_switch.o, je=je_switch.o, co=co_switch.o, n=n)
 
     circuit.initialize()
     display = Display()
     display.draw_box(
         components=([manualJ_switches.we_switch]
                     + manualJ_switches.switches[::-1]),
-        labels=['WE'] + [f'I{j+1}' for j in range(n)][::-1],
-        colors=[yellow] + [green] * n,
-        title='Manual jump inputs', yoffset=-60, sep_after=[1]
+        labels=['WE'] + [f'I{j+1}' for j in range(8)][::-1],
+        colors=[yellow] + [green] * 8,
+        title='Manual jump inputs', yoffset=-180, sep_after=[1]
+    )
+    display.draw_box(
+        components=bus.bulbs[::-1], labels=[f'B{j+1}' for j in range(8)][::-1],
+        colors=[green for _ in range(8)], title='Bus', yoffset=-60
     )
     display.draw_box(
         components=([clock.switch, ce_switch, je_switch, co_switch]
