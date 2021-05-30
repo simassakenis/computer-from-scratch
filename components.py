@@ -47,10 +47,12 @@ class Branch12:
                     self.i.c.update_left(self, self.o1.val * self.o2.val)
         elif c == self.o2.c and self.o2.val != val:
             if self.o2.val == -1:
-                self.o1.c.update_right(self, self.i.val)
+                if self.o1.c is not None:
+                    self.o1.c.update_right(self, self.i.val)
             self.o2.val = val
             if val == -1:
-                self.o1.c.update_right(self, 0)
+                if self.o1.c is not None:
+                    self.o1.c.update_right(self, 0)
             if self.o1.val == 0 or self.o2.val == 0:
                 if self.i.c is not None:
                     self.i.c.update_left(self, self.o1.val + self.o2.val)
@@ -282,10 +284,10 @@ class XOR:
 
 class Branch1n:
     def __init__(self, circuit, n, i=None, o=None):
+        n = max(n, 2)
         branch = Branch12(circuit=circuit)
         self.i = [branch.i]
         self.o = [branch.o1]
-        assert n >= 2
         for _ in range(n - 2):
             branch = Branch12(circuit=circuit, i=branch.o2)
             self.o.append(branch.o1)
@@ -375,6 +377,26 @@ class ManualSwitches:
             if o is not None and len(o) > j and o[j] is not None:
                 self.o[j].c = o[j].parent
                 o[j].c = self.o[j].parent
+
+
+class SRLatch:
+    def __init__(self, circuit, s=None, r=None, o=None):
+        or_gate = OR(circuit=circuit)
+        not_gate = NOT(circuit=circuit)
+        and_gate = AND(circuit=circuit, i1=or_gate.o, i2=not_gate.o)
+        branch = Branch12(circuit=circuit, i=and_gate.o, o2=or_gate.i1)
+        self.s = or_gate.i2
+        if s is not None:
+            self.s.c = s.parent
+            s.c = self.s.parent
+        self.r = not_gate.i
+        if r is not None:
+            self.r.c = r.parent
+            r.c = self.r.parent
+        self.o = branch.o1
+        if o is not None:
+            self.o.c = o.parent
+            o.c = self.o.parent
 
 
 class DLatch:
@@ -527,28 +549,34 @@ class SRAM:
 
 class Selector:
     def __init__(self, circuit, n, a=None, b=None, o=None, s=None):
-        branch_s = Branch1n(circuit=circuit, n=2*n)
-        nots_s = [NOT(circuit=circuit, i=branch_s.o[j]) for j in range(n, 2*n)]
-        ands_a = [AND(circuit=circuit, i2=branch_s.o[j]) for j in range(n)]
-        ands_b = [AND(circuit=circuit, i2=nots_s[j].o) for j in range(n)]
-        ors = [OR(circuit=circuit, i1=ands_a[j].o, i2=ands_b[j].o)
-               for j in range(n)]
-        self.a = [ands_a[j].i1 for j in range(n)]
+        s_branch = Branch1n(circuit=circuit, n=4)
+        s_nots = [NOT(circuit=circuit, i=s_branch.o[j]) for j in [2, 3]]
+        a_mswitch = MultiSwitch(circuit=circuit, switch=s_branch.o[1], n=n)
+        b_mswitch = MultiSwitch(circuit=circuit, switch=s_nots[0].o, n=n)
+        o_branches = [Branch21(circuit=circuit, i1=a_mswitch.o[j],
+                               i2=b_mswitch.o[j])
+                      for j in range(n)]
+        we_xor = XOR(circuit=circuit, i1=s_branch.o[0], i2=s_nots[1].o)
+        we_branch = Branch1n(circuit=circuit, i=[we_xor.o], n=n)
+        dlatches = [DLatch(circuit=circuit, i1=o_branches[j].o,
+                           i2=we_branch.o[j])
+                    for j in range(n)]
+        self.a = a_mswitch.i
         for j in range(len(self.a)):
             if a is not None and len(a) > j and a[j] is not None:
                 self.a[j].c = a[j].parent
                 a[j].c = self.a[j].parent
-        self.b = [ands_b[j].i1 for j in range(n)]
+        self.b = b_mswitch.i
         for j in range(len(self.b)):
             if b is not None and len(b) > j and b[j] is not None:
                 self.b[j].c = b[j].parent
                 b[j].c = self.b[j].parent
-        self.o = [ors[j].o for j in range(n)]
+        self.o = [dlatches[j].o for j in range(n)]
         for j in range(len(self.o)):
             if o is not None and len(o) > j and o[j] is not None:
                 self.o[j].c = o[j].parent
                 o[j].c = self.o[j].parent
-        self.s = branch_s.i[0]
+        self.s = s_branch.i[0]
         if s is not None:
             self.s.c = s.parent
             s.c = self.s.parent
@@ -693,6 +721,90 @@ class Clock:
                 self.edge_switch.toggle()
             return True
         return False
+
+
+class ClockDivider:
+    def __init__(self, circuit, clk=None, i=None, o=None, je=None):
+        je_branch = Branch12(circuit=circuit)
+        clk_branch = Branch1n(circuit=circuit, n=4)
+        clk_nots = [NOT(circuit=circuit, i=clk_branch.o[j]) for j in [1, 3]]
+        we1_and = AND(circuit=circuit, i1=clk_branch.o[0], i2=clk_branch.o[2])
+        we2_and = AND(circuit=circuit, i1=clk_nots[0].o, i2=clk_nots[1].o)
+        d1_selector = Selector(circuit=circuit, s=je_branch.o1, n=1)
+        dlatch1 = DLatch(circuit=circuit, i1=d1_selector.o[0], i2=we1_and.o)
+        d2_selector = Selector(circuit=circuit, b=[dlatch1.o],
+                               s=je_branch.o2, n=1)
+        dlatch2 = DLatch(circuit=circuit, i1=d2_selector.o[0], i2=we2_and.o)
+        o2_branch = Branch1n(circuit=circuit, i=[dlatch2.o],
+                             o=[None, None, d1_selector.a[0]], n=3)
+        o2_not = NOT(circuit=circuit, i=o2_branch.o[1], o=d1_selector.b[0])
+        self.clk = clk_branch.i[0]
+        if clk is not None:
+            self.clk.c = clk.parent
+            clk.c = self.clk.parent
+        self.i = d2_selector.a[0]
+        if i is not None:
+            self.i.c = i.parent
+            i.c = self.i.parent
+        self.o = o2_branch.o[0]
+        if o is not None:
+            self.o.c = o.parent
+            o.c = self.o.parent
+        self.je = je_branch.i
+        if je is not None:
+            self.je.c = je.parent
+            je.c = self.je.parent
+
+
+class BinaryCounter:
+    def __init__(self, circuit, n, clk=None, i=None, o=None,
+                 ce=None, je=None, co=None):
+        je_branch = Branch1n(circuit=circuit, n=2+n)
+        ce_or = OR(circuit=circuit, i2=je_branch.o[0])
+        ce_transistor = Transistor(circuit=circuit, switch=ce_or.o)
+        clk_inv = NOT(circuit=circuit, i=ce_transistor.o)
+        clk_branch = Branch1n(circuit=circuit, i=[clk_inv.o], n=1+n)
+        clk_sel = Selector(circuit=circuit,
+                           a=clk_branch.o[1:],
+                           b=[clk_branch.o[0]] + [None] * (n - 1),
+                           s=je_branch.o[1], n=n)
+        divs = [ClockDivider(circuit=circuit,
+                             clk=clk_sel.o[j],
+                             je=je_branch.o[2+j])
+                for j in range(n)]
+        o_branches = [Branch12(circuit=circuit, i=divs[j].o,
+                               o1=clk_sel.b[j+1] if j+1 < n else None)
+                      for j in range(n)]
+        o_bulbs = MultiBulbs(circuit=circuit,
+                             i=[o_branches[j].o2 for j in range(n)], n=n)
+        self.bulbs = o_bulbs.bulbs
+        co_mswitch = MultiSwitch(circuit=circuit, i=o_bulbs.o, n=n)
+        self.clk = ce_transistor.i
+        if clk is not None:
+            self.clk.c = clk.parent
+            clk.c = self.clk.parent
+        self.i = [divs[j].i for j in range(n)]
+        for j in range(len(self.i)):
+            if i is not None and len(i) > j and i[j] is not None:
+                self.i[j].c = i[j].parent
+                i[j].c = self.i[j].parent
+        self.o = co_mswitch.o
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+        self.ce = ce_or.i1
+        if ce is not None:
+            self.ce.c = ce.parent
+            ce.c = self.ce.parent
+        self.je = je_branch.i[0]
+        if je is not None:
+            self.je.c = je.parent
+            je.c = self.je.parent
+        self.co = co_mswitch.switch
+        if co is not None:
+            self.co.c = co.parent
+            co.c = self.co.parent
 
 
 class Bus:
