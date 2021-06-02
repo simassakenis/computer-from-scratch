@@ -76,7 +76,7 @@ class ComponentIndicator:
 
 
 class Display:
-    def __init__(self, width=1200, height=800):
+    def __init__(self, width=1600, height=900):
         self.width = width
         self.height = height
         self.win = graphics.GraphWin(title='Computer',
@@ -86,14 +86,14 @@ class Display:
         self.inds = []
 
     def draw_box(self, components, labels, colors, title,
-                 yoffset=0, sep_after=[]):
+                 xoffset=0, yoffset=0, sep_after=[]):
         hspace = 40
         hspaces = [1.5 if (j + 1) in sep_after else 1
                    for j in range(len(components))]
         hspaces = hspace * np.array([1.5] + hspaces[:-1] + [1.5])
         width = np.sum(hspaces)
         height = 100
-        x = (self.width / 2) - (width / 2) # upper left corner
+        x = (self.width / 2) - (width / 2) + xoffset # upper left corner
         y = (self.height / 2) - (height / 2) + yoffset # upper left corner
 
         drawRoundedRect(win=self.win,

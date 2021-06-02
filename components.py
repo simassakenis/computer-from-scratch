@@ -311,7 +311,7 @@ class Branchn1:
         for _ in range(n - 2):
             branch = Branch21(circuit=circuit, o=branch.i2)
             self.i.append(branch.i1)
-        self.o.append(branch.i2)
+        self.i.append(branch.i2)
         for j in range(len(self.i)):
             if i is not None and len(i) > j and i[j] is not None:
                 self.i[j].c = i[j].parent
@@ -503,13 +503,11 @@ class SRAM:
                                  n=nbytes)
         re_branches = [Branch1n(circuit=circuit, i=[re_mswitch.o[k]], n=8)
                        for k in range(nbytes)]
-        dlatches = [[DLatch(circuit=circuit, i2=re_branches[k].o[j])
+        d_branches = [Branch1n(circuit=circuit, n=nbytes) for j in range(8)]
+        dlatches = [[DLatch(circuit=circuit, i1=d_branches[j].o[k],
+                            i2=re_branches[k].o[j])
                      for j in range(8)]
                     for k in range(nbytes)]
-        i_branches = [Branch1n(circuit=circuit,
-                               o=[dlatches[k][j].i1 for k in range(nbytes)],
-                               n=nbytes)
-                      for j in range(8)]
         o_mswitches = [MultiSwitch(circuit=circuit,
                                    i=[dlatches[k][j].o for j in range(8)],
                                    switch=a_branches[k].o2, n=8)
@@ -527,7 +525,7 @@ class SRAM:
             if a is not None and len(a) > j and a[j] is not None:
                 self.a[j].c = a[j].parent
                 a[j].c = self.a[j].parent
-        self.i = [i_branches[j].i[0] for j in range(8)]
+        self.i = [d_branches[j].i[0] for j in range(8)]
         for j in range(len(self.i)):
             if i is not None and len(i) > j and i[j] is not None:
                 self.i[j].c = i[j].parent
@@ -724,17 +722,20 @@ class Clock:
 
 
 class ClockDivider:
-    def __init__(self, circuit, clk=None, i=None, o=None, je=None):
+    def __init__(self, circuit, clk=None, i=None, o=None, je=None, we=None):
         je_branch = Branch12(circuit=circuit)
+        we_branch = Branch12(circuit=circuit)
         clk_branch = Branch1n(circuit=circuit, n=4)
         clk_nots = [NOT(circuit=circuit, i=clk_branch.o[j]) for j in [1, 3]]
-        we1_and = AND(circuit=circuit, i1=clk_branch.o[0], i2=clk_branch.o[2])
-        we2_and = AND(circuit=circuit, i1=clk_nots[0].o, i2=clk_nots[1].o)
+        we1_clk = AND(circuit=circuit, i1=clk_branch.o[0], i2=clk_branch.o[2])
+        we1_we = AND(circuit=circuit, i1=we1_clk.o, i2=we_branch.o1)
         d1_selector = Selector(circuit=circuit, s=je_branch.o1, n=1)
-        dlatch1 = DLatch(circuit=circuit, i1=d1_selector.o[0], i2=we1_and.o)
+        dlatch1 = DLatch(circuit=circuit, i1=d1_selector.o[0], i2=we1_we.o)
+        we2_clk = AND(circuit=circuit, i1=clk_nots[0].o, i2=clk_nots[1].o)
+        we2_we = AND(circuit=circuit, i1=we2_clk.o, i2=we_branch.o2)
         d2_selector = Selector(circuit=circuit, b=[dlatch1.o],
                                s=je_branch.o2, n=1)
-        dlatch2 = DLatch(circuit=circuit, i1=d2_selector.o[0], i2=we2_and.o)
+        dlatch2 = DLatch(circuit=circuit, i1=d2_selector.o[0], i2=we2_we.o)
         o2_branch = Branch1n(circuit=circuit, i=[dlatch2.o],
                              o=[None, None, d1_selector.a[0]], n=3)
         o2_not = NOT(circuit=circuit, i=o2_branch.o[1], o=d1_selector.b[0])
@@ -754,23 +755,31 @@ class ClockDivider:
         if je is not None:
             self.je.c = je.parent
             je.c = self.je.parent
+        self.we = we_branch.i
+        if we is not None:
+            self.we.c = we.parent
+            we.c = self.we.parent
 
 
 class BinaryCounter:
     def __init__(self, circuit, n, clk=None, i=None, o=None,
                  ce=None, je=None, co=None):
-        je_branch = Branch1n(circuit=circuit, n=2+n)
-        ce_or = OR(circuit=circuit, i2=je_branch.o[0])
+        je_branch = Branch1n(circuit=circuit, n=4+n)
+        ce_or = OR(circuit=circuit, i2=je_branch.o[1])
         ce_transistor = Transistor(circuit=circuit, switch=ce_or.o)
         clk_inv = NOT(circuit=circuit, i=ce_transistor.o)
         clk_branch = Branch1n(circuit=circuit, i=[clk_inv.o], n=1+n)
         clk_sel = Selector(circuit=circuit,
                            a=clk_branch.o[1:],
                            b=[clk_branch.o[0]] + [None] * (n - 1),
-                           s=je_branch.o[1], n=n)
+                           s=je_branch.o[2], n=n)
+        div_we_xor = XOR(circuit=circuit, i1=je_branch.o[0], i2=je_branch.o[-1])
+        div_we_not = NOT(circuit=circuit, i=div_we_xor.o)
+        div_we_branch = Branch1n(circuit=circuit, i=[div_we_not.o], n=n)
         divs = [ClockDivider(circuit=circuit,
                              clk=clk_sel.o[j],
-                             je=je_branch.o[2+j])
+                             je=je_branch.o[3+j],
+                             we=div_we_branch.o[j])
                 for j in range(n)]
         o_branches = [Branch12(circuit=circuit, i=divs[j].o,
                                o1=clk_sel.b[j+1] if j+1 < n else None)
