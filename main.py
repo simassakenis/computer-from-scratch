@@ -2,7 +2,7 @@ import graphics
 from components import (
     Branch12, Branch21, Plus, Minus, Switch, Bulb, Transistor,
     NOT, AND, OR, XOR, Branch1n, MultiSwitch, MultiBulbs, ManualSwitches,
-    SRLatch, DLatch, Register, Decoder, SRAM, Selector,
+    SRLatch, DLatch, Register, Decoder, Selector, SRAM, SRAMProgrammer,
     FullAdder, nBitAdder, ALU,
     Clock, ClockDivider, BinaryCounter, Bus, Circuit
 )
@@ -491,38 +491,17 @@ if __name__ == '__main__':
     regM_we = MultiSwitch(circuit=circuit, switch=regM_we_switch.o,
                           i=regM.o, o=bus.add_write(), n=4)
 
-    manualA_switches = ManualSwitches(
-        circuit=circuit, keys=['U', 'I', 'O', 'P'][::-1],
-        we_key='v', n=m
-    )
-    manualD_switches = ManualSwitches(
-        circuit=circuit, keys=['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'][::-1],
-        we_key='v', n=8
-    )
-
-    pm_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='v')
-    pm_branch = Branch1n(circuit=circuit, i=[pm_switch.o], n=2)
-    a_selector = Selector(circuit=circuit,
-                          a=manualA_switches.o,
-                          b=regM_we.o,
-                          s=pm_branch.o[0],
-                          n=4)
-    d_selector = Selector(circuit=circuit,
-                          a=manualD_switches.o,
-                          b=bus.add_read(),
-                          s=pm_branch.o[1],
-                          n=8)
-
     sram_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='r')
     sram_re_and = AND(circuit=circuit, i1=clock_branch.o[1],
                       i2=sram_re_switch.o)
+    sram_prog = SRAMProgrammer(
+        circuit=circuit, nbytes=n, pm_key='v', a_keys=['U', 'I', 'O', 'P'],
+        d_keys = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'], re_key='L',
+        a=regM_we.o, i=bus.add_read(), re=sram_re_and.o
+    )
     sram_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
-    sram = SRAM(circuit=circuit,
-                a=a_selector.o,
-                i=d_selector.o,
-                re=sram_re_and.o,
-                we=sram_we_switch.o,
-                o=bus.add_write(),
+    sram = SRAM(circuit=circuit, a=sram_prog.ao, i=sram_prog.io,
+                re=sram_prog.reo, we=sram_we_switch.o, o=bus.add_write(),
                 nbytes=n)
 
     regI_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='k')
@@ -576,6 +555,12 @@ if __name__ == '__main__':
               su=alu_su_switch.o,
               n=8)
 
+    sram_prog.content = {
+        '0000': '00011111',
+        '0001': '00101110',
+        '0010': '00111101',
+    }
+
     circuit.initialize()
     display = Display()
     display.draw_box(
@@ -592,14 +577,18 @@ if __name__ == '__main__':
         xoffset=-400, yoffset=-180
     )
     display.draw_box(
-        components=([manualD_switches.we_switch]
-                    + manualD_switches.switches[::-1]),
-        labels=['WE'] + [f'I{j+1}' for j in range(8)][::-1],
-        colors=[red] + [green for _ in range(8)],
-        title='Manual data inputs', sep_after=[1], xoffset=-400, yoffset=-60
+        components=([sram_prog.pm_switch, sram_prog.re_switch]
+                    + sram_prog.a_switches.switches[::-1]
+                    + sram_prog.d_switches.switches[::-1]),
+        labels=(['PM', 'RE']
+                + [f'A{j+1}' for j in range(4)][::-1]
+                + [f'D{j+1}' for j in range(8)][::-1]),
+        colors=[red, yellow] + [teal] * 4 + [green] * 8,
+        title='SRAM programmer', sep_after=[1, 2, 6],
+        xoffset=-400, yoffset=-60
     )
     display.draw_box(
-        components=([sram_re_switch, sram_we_switch, pm_switch]
+        components=([sram_re_switch, sram_we_switch, sram_prog.pm_switch]
                     + sram.addr_bulbs[::-1]
                     + sram.bulbs[::-1]),
         labels=(['RE', 'WE', 'PM']

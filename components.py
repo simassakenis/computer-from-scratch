@@ -121,7 +121,7 @@ class Switch:
         if o is not None: o.c = self
         self.key = key
         self.pos = 0
-        circuit.interactive.append(self)
+        circuit.switches.append(self)
 
     def toggle(self):
         self.pos = abs(self.pos - 1)
@@ -487,6 +487,40 @@ class Decoder:
                 o[j].c = self.o[j].parent
 
 
+class Selector:
+    def __init__(self, circuit, n, a=None, b=None, o=None, s=None):
+        s_branch = Branch1n(circuit=circuit, n=4)
+        s_nots = [NOT(circuit=circuit, i=s_branch.o[j]) for j in [2, 3]]
+        a_mswitch = MultiSwitch(circuit=circuit, switch=s_branch.o[1], n=n)
+        b_mswitch = MultiSwitch(circuit=circuit, switch=s_nots[0].o, n=n)
+        o_branches = [Branch21(circuit=circuit, i1=a_mswitch.o[j],
+                               i2=b_mswitch.o[j])
+                      for j in range(n)]
+        we_xor = XOR(circuit=circuit, i1=s_branch.o[0], i2=s_nots[1].o)
+        we_branch = Branch1n(circuit=circuit, i=[we_xor.o], n=n)
+        dlatches = [DLatch(circuit=circuit, i1=o_branches[j].o,
+                           i2=we_branch.o[j])
+                    for j in range(n)]
+        self.a = a_mswitch.i
+        for j in range(len(self.a)):
+            if a is not None and len(a) > j and a[j] is not None:
+                self.a[j].c = a[j].parent
+                a[j].c = self.a[j].parent
+        self.b = b_mswitch.i
+        for j in range(len(self.b)):
+            if b is not None and len(b) > j and b[j] is not None:
+                self.b[j].c = b[j].parent
+                b[j].c = self.b[j].parent
+        self.o = [dlatches[j].o for j in range(n)]
+        for j in range(len(self.o)):
+            if o is not None and len(o) > j and o[j] is not None:
+                self.o[j].c = o[j].parent
+                o[j].c = self.o[j].parent
+        self.s = s_branch.i[0]
+        if s is not None:
+            self.s.c = s.parent
+            s.c = self.s.parent
+
 
 class SRAM:
     def __init__(self, circuit, nbytes, a=None, i=None, o=None,
@@ -545,39 +579,50 @@ class SRAM:
             we.c = self.we.parent
 
 
-class Selector:
-    def __init__(self, circuit, n, a=None, b=None, o=None, s=None):
-        s_branch = Branch1n(circuit=circuit, n=4)
-        s_nots = [NOT(circuit=circuit, i=s_branch.o[j]) for j in [2, 3]]
-        a_mswitch = MultiSwitch(circuit=circuit, switch=s_branch.o[1], n=n)
-        b_mswitch = MultiSwitch(circuit=circuit, switch=s_nots[0].o, n=n)
-        o_branches = [Branch21(circuit=circuit, i1=a_mswitch.o[j],
-                               i2=b_mswitch.o[j])
-                      for j in range(n)]
-        we_xor = XOR(circuit=circuit, i1=s_branch.o[0], i2=s_nots[1].o)
-        we_branch = Branch1n(circuit=circuit, i=[we_xor.o], n=n)
-        dlatches = [DLatch(circuit=circuit, i1=o_branches[j].o,
-                           i2=we_branch.o[j])
-                    for j in range(n)]
-        self.a = a_mswitch.i
-        for j in range(len(self.a)):
-            if a is not None and len(a) > j and a[j] is not None:
-                self.a[j].c = a[j].parent
-                a[j].c = self.a[j].parent
-        self.b = b_mswitch.i
-        for j in range(len(self.b)):
-            if b is not None and len(b) > j and b[j] is not None:
-                self.b[j].c = b[j].parent
-                b[j].c = self.b[j].parent
-        self.o = [dlatches[j].o for j in range(n)]
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
-        self.s = s_branch.i[0]
-        if s is not None:
-            self.s.c = s.parent
-            s.c = self.s.parent
+class SRAMProgrammer:
+    def __init__(self, circuit, nbytes, pm_key, a_keys, d_keys, re_key,
+                 a=None, i=None, re=None, ao=None, io=None, reo=None,
+                 content=None):
+        m = int(math.log2(nbytes))
+        assert m == math.log2(nbytes)
+        assert len(a_keys) == m and len(d_keys) == 8
+
+        self.a_switches = ManualSwitches(circuit=circuit, keys=a_keys[::-1],
+                                         we_key=pm_key, n=m)
+        self.d_switches = ManualSwitches(circuit=circuit, keys=d_keys[::-1],
+                                         we_key=pm_key, n=8)
+        self.re_switch = Switch(circuit=circuit, i=circuit.add_plus().o,
+                                key=re_key)
+        self.pm_switch = Switch(circuit=circuit, i=circuit.add_plus().o,
+                                key=pm_key)
+        selector = Selector(
+            circuit=circuit,
+            a=self.a_switches.o + self.d_switches.o + [self.re_switch.o],
+            b=a + i + [re],
+            s=self.pm_switch.o,
+            n=m + 8 + 1
+        )
+        self.ao = selector.o[:m]
+        for j in range(len(self.ao)):
+            if ao is not None and len(ao) > j and ao[j] is not None:
+                self.ao[j].c = ao[j].parent
+                ao[j].c = self.ao[j].parent
+        self.io = selector.o[m:m+8]
+        for j in range(len(self.io)):
+            if io is not None and len(io) > j and io[j] is not None:
+                self.io[j].c = io[j].parent
+                io[j].c = self.io[j].parent
+        self.reo = selector.o[-1]
+        if reo is not None:
+            self.reo.c = reo.parent
+            reo.c = self.reo.parent
+
+        self.pm_key = pm_key
+        self.a_keys = a_keys
+        self.d_keys = d_keys
+        self.re_key = re_key
+        self.content = content
+        circuit.sram_programmers.append(self)
 
 
 class FullAdder:
@@ -695,7 +740,7 @@ class Clock:
         if o2 is not None:
             self.o2.c = o2.parent
             o2.c = self.o2.parent
-        circuit.interactive.append(self)
+        circuit.clocks.append(self)
 
     def update(self, key):
         if key in ['minus', 'equal']:
@@ -847,11 +892,29 @@ class Bus:
 class Circuit:
     def __init__(self):
         self.plusses = []
-        self.interactive = []
+        self.switches = []
+        self.clocks = []
+        self.sram_programmers = []
 
     def initialize(self):
+        # initialize circuit
         for p in self.plusses:
             p.update_right(None, None)
+        # program SRAMs if requested
+        for sp in self.sram_programmers:
+            if sp.content is None:
+                continue
+            ctrl_seq = ['x', sp.pm_key]
+            seq = ctrl_seq
+            for a, v in sp.content.items():
+                a = [int(bit_str) for bit_str in a]
+                v = [int(bit_str) for bit_str in v]
+                a_seq = sum([[sp.a_keys[j]] * a[j] for j in range(len(a))], [])
+                v_seq = sum([[sp.d_keys[j]] * v[j] for j in range(len(v))], [])
+                seq += a_seq + v_seq + [sp.re_key] * 2 + a_seq + v_seq
+            seq += ctrl_seq
+            for key in seq:
+                self.update(key)
 
     def add_plus(self):
         plus = Plus(circuit=self)
@@ -862,6 +925,9 @@ class Circuit:
         return Minus(circuit=self)
 
     def update(self, key):
-        return sum(c.update(key) for c in self.interactive) > 0
+        if key == '':
+            return sum(c.update(key) for c in self.clocks) > 0
+        else:
+            return sum(c.update(key) for c in self.switches + self.clocks) > 0
 
 
