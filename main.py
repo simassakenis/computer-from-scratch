@@ -164,13 +164,13 @@ if __name__ == '__main__':
     #     colors=[green for _ in range(n)], title='Bus', yoffset=-60
     # )
     # display.draw_box(
-    #     components=[clock.switch, regA_re_switch, regA_we_switch] + regA.bulbs,
+    #     components=[clock.bulb, regA_re_switch, regA_we_switch] + regA.bulbs,
     #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
     #     colors=[blue, yellow, yellow] + [green for _ in range(n)],
     #     title='Register A', yoffset=60, sep_after=[3]
     # )
     # display.draw_box(
-    #     components=[clock.switch, regB_re_switch, regB_we_switch] + regB.bulbs,
+    #     components=[clock.bulb, regB_re_switch, regB_we_switch] + regB.bulbs,
     #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
     #     colors=[blue, yellow, yellow] + [green for _ in range(n)],
     #     title='Register B', yoffset=180, sep_after=[3]
@@ -285,21 +285,21 @@ if __name__ == '__main__':
     #     colors=[green for _ in range(n)], title='Bus', yoffset=-180
     # )
     # display.draw_box(
-    #     components=([clock.switch, regA_re_switch, regA_we_switch]
+    #     components=([clock.bulb, regA_re_switch, regA_we_switch]
     #                 + regA.bulbs[::-1]),
     #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)][::-1],
     #     colors=[blue, yellow, yellow] + [green for _ in range(n)],
     #     title='Register A', yoffset=-60, sep_after=[3]
     # )
     # display.draw_box(
-    #     components=([clock.switch, regB_re_switch, regB_we_switch]
+    #     components=([clock.bulb, regB_re_switch, regB_we_switch]
     #                 + regB.bulbs[::-1]),
     #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
     #     colors=[blue, yellow, yellow] + [green for _ in range(n)],
     #     title='Register B', yoffset=60, sep_after=[3]
     # )
     # display.draw_box(
-    #     components=([clock.switch, regC_re_switch, regC_we_switch]
+    #     components=([clock.bulb, regC_re_switch, regC_we_switch]
     #                 + regC.bulbs[::-1]),
     #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(n)],
     #     colors=[blue, yellow, yellow] + [green for _ in range(n)],
@@ -407,7 +407,7 @@ if __name__ == '__main__':
     #     colors=[green for _ in range(8)], title='Bus', yoffset=-180
     # )
     # display.draw_box(
-    #     components=([clock.switch, regM_re_switch, regM_we_switch]
+    #     components=([clock.bulb, regM_re_switch, regM_we_switch]
     #                 + regM.bulbs[::-1]),
     #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(4)][::-1],
     #     colors=[blue, yellow, yellow] + [green for _ in range(4)],
@@ -468,98 +468,347 @@ if __name__ == '__main__':
     #     colors=[green for _ in range(8)], title='Bus', yoffset=-60
     # )
     # display.draw_box(
-    #     components=([clock.switch, ce_switch, je_switch, co_switch]
+    #     components=([clock.bulb, ce_switch, je_switch, co_switch]
     #                 + counter.bulbs[::-1]),
     #     labels=['CLK', 'CE', 'JE', 'CO'] + [f'O{j+1}' for j in range(n)][::-1],
     #     colors=[blue, yellow, yellow, yellow] + [green] * n,
     #     title='Binary counter', yoffset=60, sep_after=[1, 4]
     # )
 
-    # Assembled components demo
+    # # Assembled components demo (manual controls)
+    # n = 16
+    # m = 4
+
+    # circuit = Circuit()
+    # clock = Clock(circuit=circuit)
+    # clock_branch = Branch1n(circuit=circuit, i=[clock.o2], n=6)
+    # bus = Bus(circuit=circuit, n=8)
+
+    # regM_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='n')
+    # regM = Register(circuit=circuit, i=bus.add_read(), re=regM_re_switch.o,
+    #                 clk=clock_branch.o[0], n=4)
+    # regM_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='m')
+    # regM_we = MultiSwitch(circuit=circuit, switch=regM_we_switch.o,
+    #                       i=regM.o, o=bus.add_write(), n=4)
+
+    # sram_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='r')
+    # sram_re_and = AND(circuit=circuit, i1=clock_branch.o[1],
+    #                   i2=sram_re_switch.o)
+    # sram_prog = SRAMProgrammer(
+    #     circuit=circuit, nbytes=n, pm_key='v', a_keys=['U', 'I', 'O', 'P'],
+    #     d_keys = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'], re_key='L',
+    #     a=regM_we.o, i=bus.add_read(), re=sram_re_and.o
+    # )
+    # sram_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
+    # sram = SRAM(circuit=circuit, a=sram_prog.ao, i=sram_prog.io,
+    #             re=sram_prog.reo, we=sram_we_switch.o, o=bus.add_write(),
+    #             nbytes=n)
+
+    # regI_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='k')
+    # regI = Register(circuit=circuit, i=bus.add_read(), re=regI_re_switch.o,
+    #                 clk=clock_branch.o[2], n=8)
+    # regI_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='l')
+    # regI_we = MultiSwitch(circuit=circuit, switch=regI_we_switch.o,
+    #                       i=regI.o[:4], o=bus.add_write()[:4], n=4)
+
+    # ce_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='u')
+    # je_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='i')
+    # co_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='o')
+    # counter = BinaryCounter(circuit=circuit, clk=clock.o1,
+    #                         i=bus.add_read(), o=bus.add_write(),
+    #                         ce=ce_switch.o, je=je_switch.o, co=co_switch.o, n=4)
+
+    # regA_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='a')
+    # regA = Register(circuit=circuit, i=bus.add_read(), re=regA_re_switch.o,
+    #                 clk=clock_branch.o[3], n=8)
+    # regA_branches = [Branch12(circuit=circuit, i=regA.o[j]) for j in range(8)]
+    # regA_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='s')
+    # regA_we = MultiSwitch(circuit=circuit, switch=regA_we_switch.o,
+    #                       i=[regA_branches[j].o1 for j in range(8)],
+    #                       o=bus.add_write(), n=8)
+
+    # regB_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='d')
+    # regB = Register(circuit=circuit, i=bus.add_read(), re=regB_re_switch.o,
+    #                 clk=clock_branch.o[4], n=8)
+    # regB_branches = [Branch12(circuit=circuit, i=regB.o[j]) for j in range(8)]
+    # regB_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='f')
+    # regB_we = MultiSwitch(circuit=circuit, switch=regB_we_switch.o,
+    #                       i=[regB_branches[j].o1 for j in range(8)],
+    #                       o=bus.add_write(), n=8)
+
+    # regC_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='g')
+    # regC = Register(circuit=circuit, i=bus.add_read(), re=regC_re_switch.o,
+    #                 clk=clock_branch.o[5], n=8)
+    # regC_branches = [Branch12(circuit=circuit, i=regC.o[j]) for j in range(8)]
+    # regC_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='h')
+    # regC_we = MultiSwitch(circuit=circuit, switch=regC_we_switch.o,
+    #                       i=[regC_branches[j].o1 for j in range(8)],
+    #                       o=bus.add_write(), n=8)
+
+    # alu_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='j')
+    # alu_su_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='p')
+    # alu = ALU(circuit=circuit,
+    #           a=[regA_branches[j].o2 for j in range(8)],
+    #           b=[regB_branches[j].o2 for j in range(8)],
+    #           s=bus.add_write(),
+    #           we=alu_we_switch.o,
+    #           su=alu_su_switch.o,
+    #           n=8)
+
+    # sram_prog.content = {
+    #     '0000': '00011111',
+    #     '0001': '00101110',
+    #     '0010': '00111101',
+    #     '1110': '00011100',
+    #     '1111': '00001110',
+    # }
+
+    # circuit.initialize()
+    # display = Display()
+    # display.draw_box(
+    #     components=bus.bulbs[::-1], labels=[f'B{j+1}' for j in range(8)][::-1],
+    #     colors=[green for _ in range(8)], title='Bus',
+    #     xoffset=-400, yoffset=-300
+    # )
+    # display.draw_box(
+    #     components=([clock.switch, regM_re_switch, regM_we_switch]
+    #                 + regM.bulbs[::-1]),
+    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(4)][::-1],
+    #     colors=[blue, yellow, yellow] + [green for _ in range(4)],
+    #     title='Memory address register', sep_after=[3],
+    #     xoffset=-400, yoffset=-180
+    # )
+    # display.draw_box(
+    #     components=([sram_prog.pm_switch, sram_prog.re_switch]
+    #                 + sram_prog.a_switches.switches[::-1]
+    #                 + sram_prog.d_switches.switches[::-1]),
+    #     labels=(['PM', 'RE']
+    #             + [f'A{j+1}' for j in range(4)][::-1]
+    #             + [f'D{j+1}' for j in range(8)][::-1]),
+    #     colors=[red, yellow] + [teal] * 4 + [green] * 8,
+    #     title='SRAM programmer', sep_after=[1, 2, 6],
+    #     xoffset=-400, yoffset=-60
+    # )
+    # display.draw_box(
+    #     components=([sram_re_switch, sram_we_switch, sram_prog.pm_switch]
+    #                 + sram.addr_bulbs[::-1]
+    #                 + sram.bulbs[::-1]),
+    #     labels=(['RE', 'WE', 'PM']
+    #             + [f'A{j+1}' for j in range(4)][::-1]
+    #             + [f'R{j+1}' for j in range(8)][::-1]),
+    #     colors=[yellow, yellow, red] + [teal] * 4 + [green] * 8, title='SRAM',
+    #     sep_after=[2, 3, 7], xoffset=-400, yoffset=60
+    # )
+    # display.draw_box(
+    #     components=([clock.switch, regI_re_switch, regI_we_switch]
+    #                 + regI.bulbs[::-1]),
+    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
+    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
+    #     title='Instruction Register', sep_after=[3], xoffset=-400, yoffset=180
+    # )
+    # display.draw_box(
+    #     components=([clock.switch, ce_switch, je_switch, co_switch]
+    #                 + counter.bulbs[::-1]),
+    #     labels=['CLK', 'CE', 'JE', 'CO'] + [f'O{j+1}' for j in range(4)][::-1],
+    #     colors=[blue, yellow, yellow, yellow] + [green] * 4,
+    #     title='Program counter', sep_after=[1, 4], xoffset=400, yoffset=-300
+    # )
+    # display.draw_box(
+    #     components=([clock.switch, regA_re_switch, regA_we_switch]
+    #                 + regA.bulbs[::-1]),
+    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)][::-1],
+    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
+    #     title='Register A', sep_after=[3], xoffset=400, yoffset=-180
+    # )
+    # display.draw_box(
+    #     components=[alu_we_switch, alu_su_switch] + alu.bulbs[::-1],
+    #     labels=['WE', 'SU'] + [f'S{j+1}' for j in range(8)][::-1],
+    #     colors=[yellow, yellow] + [green for _ in range(8)],
+    #     title='ALU', sep_after=[2], xoffset=400, yoffset=-60
+    # )
+    # display.draw_box(
+    #     components=([clock.switch, regB_re_switch, regB_we_switch]
+    #                 + regB.bulbs[::-1]),
+    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
+    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
+    #     title='Register B', sep_after=[3], xoffset=400, yoffset=60
+    # )
+    # display.draw_box(
+    #     components=([clock.switch, regC_re_switch, regC_we_switch]
+    #                 + regC.bulbs[::-1]),
+    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
+    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
+    #     title='Register C', sep_after=[3], xoffset=400, yoffset=180
+    # )
+
+    # Controller demo
     n = 16
     m = 4
 
     circuit = Circuit()
-    clock = Clock(circuit=circuit)
+    hlt_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
+    clock = Clock(circuit=circuit, hlt=hlt_switch.o)
     clock_branch = Branch1n(circuit=circuit, i=[clock.o2], n=6)
+    clk_full_branch = Branch1n(circuit=circuit, i=[clock.o1], n=2)
     bus = Bus(circuit=circuit, n=8)
 
-    regM_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='n')
+    regM_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regM = Register(circuit=circuit, i=bus.add_read(), re=regM_re_switch.o,
                     clk=clock_branch.o[0], n=4)
-    regM_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='m')
-    regM_we = MultiSwitch(circuit=circuit, switch=regM_we_switch.o,
-                          i=regM.o, o=bus.add_write(), n=4)
-
-    sram_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='r')
+    sram_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     sram_re_and = AND(circuit=circuit, i1=clock_branch.o[1],
                       i2=sram_re_switch.o)
     sram_prog = SRAMProgrammer(
         circuit=circuit, nbytes=n, pm_key='v', a_keys=['U', 'I', 'O', 'P'],
         d_keys = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'], re_key='L',
-        a=regM_we.o, i=bus.add_read(), re=sram_re_and.o
+        a=regM.o, i=bus.add_read(), re=sram_re_and.o
     )
-    sram_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
+    sram_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     sram = SRAM(circuit=circuit, a=sram_prog.ao, i=sram_prog.io,
                 re=sram_prog.reo, we=sram_we_switch.o, o=bus.add_write(),
                 nbytes=n)
 
-    regI_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='k')
+    regI_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regI = Register(circuit=circuit, i=bus.add_read(), re=regI_re_switch.o,
                     clk=clock_branch.o[2], n=8)
-    regI_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='l')
+    regI_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regI_we = MultiSwitch(circuit=circuit, switch=regI_we_switch.o,
                           i=regI.o[:4], o=bus.add_write()[:4], n=4)
 
-    ce_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='u')
-    je_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='i')
-    co_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='o')
-    counter = BinaryCounter(circuit=circuit, clk=clock.o1,
-                            i=bus.add_read(), o=bus.add_write(),
-                            ce=ce_switch.o, je=je_switch.o, co=co_switch.o, n=4)
+    ce_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
+    je_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
+    co_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
+    prog_ctr = BinaryCounter(circuit=circuit, n=4, clk=clk_full_branch.o[0],
+                             i=bus.add_read(), o=bus.add_write(),
+                             ce=ce_switch.o, je=je_switch.o, co=co_switch.o)
 
-    regA_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='a')
+    regA_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regA = Register(circuit=circuit, i=bus.add_read(), re=regA_re_switch.o,
                     clk=clock_branch.o[3], n=8)
     regA_branches = [Branch12(circuit=circuit, i=regA.o[j]) for j in range(8)]
-    regA_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='s')
+    regA_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regA_we = MultiSwitch(circuit=circuit, switch=regA_we_switch.o,
                           i=[regA_branches[j].o1 for j in range(8)],
                           o=bus.add_write(), n=8)
 
-    regB_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='d')
+    regB_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regB = Register(circuit=circuit, i=bus.add_read(), re=regB_re_switch.o,
                     clk=clock_branch.o[4], n=8)
-    regB_branches = [Branch12(circuit=circuit, i=regB.o[j]) for j in range(8)]
-    regB_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='f')
-    regB_we = MultiSwitch(circuit=circuit, switch=regB_we_switch.o,
-                          i=[regB_branches[j].o1 for j in range(8)],
-                          o=bus.add_write(), n=8)
 
-    regC_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='g')
+    regC_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regC = Register(circuit=circuit, i=bus.add_read(), re=regC_re_switch.o,
                     clk=clock_branch.o[5], n=8)
     regC_branches = [Branch12(circuit=circuit, i=regC.o[j]) for j in range(8)]
-    regC_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='h')
+    regC_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regC_we = MultiSwitch(circuit=circuit, switch=regC_we_switch.o,
                           i=[regC_branches[j].o1 for j in range(8)],
                           o=bus.add_write(), n=8)
 
-    alu_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='j')
-    alu_su_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='p')
+    alu_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
+    alu_su_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     alu = ALU(circuit=circuit,
               a=[regA_branches[j].o2 for j in range(8)],
-              b=[regB_branches[j].o2 for j in range(8)],
+              b=regB.o,
               s=bus.add_write(),
               we=alu_we_switch.o,
               su=alu_su_switch.o,
               n=8)
 
+    clk_not = NOT(circuit=circuit, i=clk_full_branch.o[1])
+    step_ctr = BinaryCounter(circuit=circuit, n=3, clk=clk_not.o,
+                             ce=circuit.add_plus().o, co=circuit.add_plus().o)
+
+    controls = [
+        hlt_switch.switch,
+        regM_re_switch.switch,
+        sram_re_switch.switch,
+        sram_we_switch.switch,
+        regI_re_switch.switch,
+        regI_we_switch.switch,
+        regA_re_switch.switch,
+        regA_we_switch.switch,
+        alu_we_switch.switch,
+        alu_su_switch.switch,
+        regB_re_switch.switch,
+        regC_re_switch.switch,
+        regC_we_switch.switch,
+        ce_switch.switch,
+        je_switch.switch,
+        co_switch.switch
+    ]
+    nctrl_srams = 2
+    step_branches = [Branch1n(circuit=circuit, i=[step_ctr.o[j]], n=nctrl_srams)
+                     for j in range(3)]
+    regI_o_branches = [Branch1n(circuit=circuit, i=[regI.o[4+j]], n=nctrl_srams)
+                       for j in range(4)]
+    ctrl_progs = [None] * nctrl_srams
+    ctrl_srams = [None] * nctrl_srams
+    for i in range(nctrl_srams):
+        ctrl_progs[i] = SRAMProgrammer(
+            circuit=circuit, nbytes=256, pm_key=f'c{i}',
+            a_keys=['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+            d_keys = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'], re_key='L',
+            a=([step_branches[j].o[i] for j in range(3)]
+               + [regI_o_branches[j].o[i] for j in range(4)]
+               + [None]),
+            i=[None] * 8
+        )
+        ctrl_srams[i] = SRAM(
+            circuit=circuit, a=ctrl_progs[i].ao, i=ctrl_progs[i].io,
+            o=controls[8*i:8*(i+1)][::-1], re=ctrl_progs[i].reo,
+            we=circuit.add_plus().o, nbytes=256
+        )
+
     sram_prog.content = {
         '0000': '00011111',
         '0001': '00101110',
-        '0010': '00111101',
+        '0010': '11100000',
+        '0011': '11110000',
+        '1110': '00011100',
+        '1111': '00001110',
     }
+
+    NOP = int('0000000000000000', 2)
+    HLT = int('1000000000000000', 2)
+    MI  = int('0100000000000000', 2)
+    RI  = int('0010000000000000', 2)
+    RO  = int('0001000000000000', 2)
+    II  = int('0000100000000000', 2)
+    IO  = int('0000010000000000', 2)
+    AI  = int('0000001000000000', 2)
+    AO  = int('0000000100000000', 2)
+    SO  = int('0000000010000000', 2)
+    SU  = int('0000000001000000', 2)
+    BI  = int('0000000000100000', 2)
+    CI  = int('0000000000010000', 2)
+    CO  = int('0000000000001000', 2)
+    PCE = int('0000000000000100', 2)
+    PCI = int('0000000000000010', 2)
+    PCO = int('0000000000000001', 2)
+    ctrl_content_vals = [
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 0000 - NOP
+        PCO|MI, RO|II, PCE, IO|MI, RO|AI, NOP,   NOP,   NOP, # 0001 - LDA
+        PCO|MI, RO|II, PCE, IO|MI, RO|BI, SO|CI, CO|AI, NOP, # 0010 - ADD
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 0011
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 0100
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 0101
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 0110
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 0111
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 1000
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 1001
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 1010
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 1011
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 1100
+        PCO|MI, RO|II, PCE, NOP,   NOP,   NOP,   NOP,   NOP, # 1101
+        PCO|MI, RO|II, PCE, AO|CI, NOP,   NOP,   NOP,   NOP, # 1110 - OUT
+        PCO|MI, RO|II, PCE, HLT,   NOP,   NOP,   NOP,   NOP, # 1111 - HLT
+    ]
+    binstr = lambda x, w: bin(x)[2:].zfill(w)
+    for i in range(nctrl_srams):
+        ctrl_progs[i].content = {
+            binstr(j, 8): binstr(v, 8*nctrl_srams)[8*i:8*(i+1)]
+            for j, v in enumerate(ctrl_content_vals)
+        }
 
     circuit.initialize()
     display = Display()
@@ -569,11 +818,11 @@ if __name__ == '__main__':
         xoffset=-400, yoffset=-300
     )
     display.draw_box(
-        components=([clock.switch, regM_re_switch, regM_we_switch]
+        components=([clock.bulb, regM_re_switch]
                     + regM.bulbs[::-1]),
-        labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(4)][::-1],
-        colors=[blue, yellow, yellow] + [green for _ in range(4)],
-        title='Memory address register', sep_after=[3],
+        labels=['CLK', 'RE'] + [f'D{j+1}' for j in range(4)][::-1],
+        colors=[blue, yellow] + [green for _ in range(4)],
+        title='Memory address register', sep_after=[2],
         xoffset=-400, yoffset=-180
     )
     display.draw_box(
@@ -598,21 +847,21 @@ if __name__ == '__main__':
         sep_after=[2, 3, 7], xoffset=-400, yoffset=60
     )
     display.draw_box(
-        components=([clock.switch, regI_re_switch, regI_we_switch]
+        components=([clock.bulb, regI_re_switch, regI_we_switch]
                     + regI.bulbs[::-1]),
         labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
         colors=[blue, yellow, yellow] + [green for _ in range(8)],
         title='Instruction Register', sep_after=[3], xoffset=-400, yoffset=180
     )
     display.draw_box(
-        components=([clock.switch, ce_switch, je_switch, co_switch]
-                    + counter.bulbs[::-1]),
+        components=([clock.bulb, ce_switch, je_switch, co_switch]
+                    + prog_ctr.bulbs[::-1]),
         labels=['CLK', 'CE', 'JE', 'CO'] + [f'O{j+1}' for j in range(4)][::-1],
         colors=[blue, yellow, yellow, yellow] + [green] * 4,
         title='Program counter', sep_after=[1, 4], xoffset=400, yoffset=-300
     )
     display.draw_box(
-        components=([clock.switch, regA_re_switch, regA_we_switch]
+        components=([clock.bulb, regA_re_switch, regA_we_switch]
                     + regA.bulbs[::-1]),
         labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)][::-1],
         colors=[blue, yellow, yellow] + [green for _ in range(8)],
@@ -625,18 +874,28 @@ if __name__ == '__main__':
         title='ALU', sep_after=[2], xoffset=400, yoffset=-60
     )
     display.draw_box(
-        components=([clock.switch, regB_re_switch, regB_we_switch]
+        components=([clock.bulb, regB_re_switch]
                     + regB.bulbs[::-1]),
-        labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
-        colors=[blue, yellow, yellow] + [green for _ in range(8)],
-        title='Register B', sep_after=[3], xoffset=400, yoffset=60
+        labels=['CLK', 'RE'] + [f'D{j+1}' for j in range(8)],
+        colors=[blue, yellow] + [green for _ in range(8)],
+        title='Register B', sep_after=[2], xoffset=400, yoffset=60
     )
     display.draw_box(
-        components=([clock.switch, regC_re_switch, regC_we_switch]
+        components=([clock.bulb, regC_re_switch, regC_we_switch]
                     + regC.bulbs[::-1]),
         labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
         colors=[blue, yellow, yellow] + [green for _ in range(8)],
         title='Register C', sep_after=[3], xoffset=400, yoffset=180
+    )
+    display.draw_box(
+        components=(ctrl_srams[0].addr_bulbs[::-1]
+                    + ctrl_srams[0].bulbs[::-1]
+                    + ctrl_srams[1].bulbs[::-1]),
+        labels=(['S1', 'S2', 'S3', 'I1', 'I2', 'I3', 'I4', '[]'][::-1]
+                + ['HLT', 'MI', 'RI', 'RO', 'IO', 'II', 'AI', 'AO']
+                + ['SO', 'SU', 'BI', 'CI', 'CO', 'PCE', 'PCI', 'PCO']),
+        colors=[teal] * 8 + [yellow] * 16, title='Controller',
+        sep_after=[8], xoffset=0, yoffset=300
     )
 
     while True:

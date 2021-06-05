@@ -725,18 +725,30 @@ class ALU:
 
 
 class Clock:
-    def __init__(self, circuit, o1=None, o2=None):
-        self.manual_mode = False
+    def __init__(self, circuit, hlt=None, o1=None, o2=None):
+        self.manual_mode = True
         self.speed = 0.5 # in Hertz
         self.delta = 0.5 # in Hertz
         self.t = time.time()
-        self.switch = Switch(circuit=circuit, i=circuit.add_plus().o)
-        self.edge_switch = Switch(circuit=circuit, i=circuit.add_plus().o)
-        self.o1 = self.switch.o
+
+        hlt_not = NOT(circuit=circuit)
+        transistor = Transistor(circuit=circuit, i=circuit.add_plus().o,
+                                switch=hlt_not.o)
+        tr_branch = Branch12(circuit=circuit, i=transistor.o)
+        self.switch = Switch(circuit=circuit, i=tr_branch.o1)
+        self.edge_switch = Switch(circuit=circuit, i=tr_branch.o2)
+        mbulbs = MultiBulbs(circuit=circuit,
+                            i=[self.switch.o, self.edge_switch.o], n=2)
+        self.bulb = mbulbs.bulbs[0]
+        self.hlt = hlt_not.i
+        if hlt is not None:
+            self.hlt.c = hlt.parent
+            hlt.c = self.hlt.parent
+        self.o1 = mbulbs.o[0]
         if o1 is not None:
             self.o1.c = o1.parent
             o1.c = self.o1.parent
-        self.o2 = self.edge_switch.o
+        self.o2 = mbulbs.o[1]
         if o2 is not None:
             self.o2.c = o2.parent
             o2.c = self.o2.parent
@@ -904,15 +916,14 @@ class Circuit:
         for sp in self.sram_programmers:
             if sp.content is None:
                 continue
-            ctrl_seq = ['x', sp.pm_key]
-            seq = ctrl_seq
+            seq = [sp.pm_key]
             for a, v in sp.content.items():
                 a = [int(bit_str) for bit_str in a]
                 v = [int(bit_str) for bit_str in v]
                 a_seq = sum([[sp.a_keys[j]] * a[j] for j in range(len(a))], [])
                 v_seq = sum([[sp.d_keys[j]] * v[j] for j in range(len(v))], [])
                 seq += a_seq + v_seq + [sp.re_key] * 2 + a_seq + v_seq
-            seq += ctrl_seq
+            seq += [sp.pm_key]
             for key in seq:
                 self.update(key)
 
