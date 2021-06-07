@@ -649,12 +649,16 @@ if __name__ == '__main__':
     hlt_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     clock = Clock(circuit=circuit, hlt=hlt_switch.o)
     clock_branch = Branch1n(circuit=circuit, i=[clock.o2], n=6)
-    clk_full_branch = Branch1n(circuit=circuit, i=[clock.o1], n=2)
+    clk_full_branch = Branch1n(circuit=circuit, i=[clock.o1], n=4)
     bus = Bus(circuit=circuit, n=8)
+
+    reset_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='Q')
+    reset_branch = Branch1n(circuit=circuit, i=[reset_switch.o], n=7)
 
     regM_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regM = Register(circuit=circuit, i=bus.add_read(), re=regM_re_switch.o,
-                    clk=clock_branch.o[0], n=4)
+                    clk=clock_branch.o[0], reset=reset_branch.o[0], n=4)
+
     sram_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     sram_re_and = AND(circuit=circuit, i1=clock_branch.o[1],
                       i2=sram_re_switch.o)
@@ -670,21 +674,29 @@ if __name__ == '__main__':
 
     regI_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regI = Register(circuit=circuit, i=bus.add_read(), re=regI_re_switch.o,
-                    clk=clock_branch.o[2], n=8)
+                    clk=clock_branch.o[2], reset=reset_branch.o[1], n=8)
     regI_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regI_we = MultiSwitch(circuit=circuit, switch=regI_we_switch.o,
                           i=regI.o[:4], o=bus.add_write()[:4], n=4)
 
+    regII_re_nots = [NOT(circuit=circuit, i=clk_full_branch.o[j])
+                      for j in [0, 3]]
+    regII_re_and = AND(circuit=circuit, i1=regII_re_nots[0].o,
+                        i2=regII_re_nots[1].o)
+    regII = Register(circuit=circuit, i=regI.o[4:], re=regII_re_and.o,
+                     clk=circuit.add_plus().o, n=4)
+
     ce_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     je_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     co_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
-    prog_ctr = BinaryCounter(circuit=circuit, n=4, clk=clk_full_branch.o[0],
+    prog_ctr = BinaryCounter(circuit=circuit, clk=clk_full_branch.o[1],
                              i=bus.add_read(), o=bus.add_write(),
-                             ce=ce_switch.o, je=je_switch.o, co=co_switch.o)
+                             ce=ce_switch.o, je=je_switch.o, co=co_switch.o,
+                             reset=reset_branch.o[2], n=4)
 
     regA_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regA = Register(circuit=circuit, i=bus.add_read(), re=regA_re_switch.o,
-                    clk=clock_branch.o[3], n=8)
+                    clk=clock_branch.o[3], reset=reset_branch.o[3], n=8)
     regA_branches = [Branch12(circuit=circuit, i=regA.o[j]) for j in range(8)]
     regA_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regA_we = MultiSwitch(circuit=circuit, switch=regA_we_switch.o,
@@ -693,11 +705,11 @@ if __name__ == '__main__':
 
     regB_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regB = Register(circuit=circuit, i=bus.add_read(), re=regB_re_switch.o,
-                    clk=clock_branch.o[4], n=8)
+                    clk=clock_branch.o[4], reset=reset_branch.o[4], n=8)
 
     regC_re_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regC = Register(circuit=circuit, i=bus.add_read(), re=regC_re_switch.o,
-                    clk=clock_branch.o[5], n=8)
+                    clk=clock_branch.o[5], reset=reset_branch.o[5], n=8)
     regC_branches = [Branch12(circuit=circuit, i=regC.o[j]) for j in range(8)]
     regC_we_switch = Transistor(circuit=circuit, i=circuit.add_plus().o)
     regC_we = MultiSwitch(circuit=circuit, switch=regC_we_switch.o,
@@ -714,9 +726,10 @@ if __name__ == '__main__':
               su=alu_su_switch.o,
               n=8)
 
-    clk_not = NOT(circuit=circuit, i=clk_full_branch.o[1])
+    clk_not = NOT(circuit=circuit, i=clk_full_branch.o[2])
     step_ctr = BinaryCounter(circuit=circuit, n=3, clk=clk_not.o,
-                             ce=circuit.add_plus().o, co=circuit.add_plus().o)
+                             ce=circuit.add_plus().o, co=circuit.add_plus().o,
+                             reset=reset_branch.o[6])
 
     controls = [
         hlt_switch.switch,
@@ -739,7 +752,8 @@ if __name__ == '__main__':
     nctrl_srams = 2
     step_branches = [Branch1n(circuit=circuit, i=[step_ctr.o[j]], n=nctrl_srams)
                      for j in range(3)]
-    regI_o_branches = [Branch1n(circuit=circuit, i=[regI.o[4+j]], n=nctrl_srams)
+    regI_o_branches = [Branch1n(circuit=circuit, i=[regII.o[j]],
+                                n=nctrl_srams)
                        for j in range(4)]
     ctrl_progs = [None] * nctrl_srams
     ctrl_srams = [None] * nctrl_srams
@@ -888,14 +902,16 @@ if __name__ == '__main__':
         title='Register C', sep_after=[3], xoffset=400, yoffset=180
     )
     display.draw_box(
-        components=(ctrl_srams[0].addr_bulbs[::-1]
+        components=([reset_switch]
+                    + ctrl_srams[0].addr_bulbs[::-1]
                     + ctrl_srams[0].bulbs[::-1]
                     + ctrl_srams[1].bulbs[::-1]),
-        labels=(['S1', 'S2', 'S3', 'I1', 'I2', 'I3', 'I4', '[]'][::-1]
-                + ['HLT', 'MI', 'RI', 'RO', 'IO', 'II', 'AI', 'AO']
+        labels=(['RS']
+                + ['S1', 'S2', 'S3', 'I1', 'I2', 'I3', 'I4', '[]'][::-1]
+                + ['HLT', 'MI', 'RI', 'RO', 'II', 'IO', 'AI', 'AO']
                 + ['SO', 'SU', 'BI', 'CI', 'CO', 'PCE', 'PCI', 'PCO']),
-        colors=[teal] * 8 + [yellow] * 16, title='Controller',
-        sep_after=[8], xoffset=0, yoffset=300
+        colors=[red] + [teal] * 8 + [yellow] * 16, title='Controller',
+        sep_after=[1, 9], xoffset=0, yoffset=300
     )
 
     while True:
