@@ -792,18 +792,22 @@ if __name__ == '__main__':
         )
 
     sram_prog.content = {
-        '0000': '00011111',
-        '0001': '00101110',
-        '0010': '11100000',
-        '0011': '11110000',
-        '1110': '00011100',
-        '1111': '00001110',
+        '0000': '01010011', # LDI 3
+        '0001': '01001111', # STA 15
+        '0010': '01010000', # LDI 0
+        '0011': '00101111', # ADD 15
+        '0100': '11100000', # OUT
+        '0101': '01100011', # JMP 3
     }
 
     instruction_set = {
         'NOP': ('0000', 'PCO MI, RO II PCE'),
         'LDA': ('0001', 'PCO MI, RO II PCE, IO MI, RO AI'),
         'ADD': ('0010', 'PCO MI, RO II PCE, IO MI, RO BI, SO CI, CO AI'),
+        'SUB': ('0011', 'PCO MI, RO II PCE, IO MI, RO BI, SO CI SU, CO AI'),
+        'STA': ('0100', 'PCO MI, RO II PCE, IO MI, AO RI'),
+        'LDI': ('0101', 'PCO MI, RO II PCE, IO AI'),
+        'JMP': ('0110', 'PCO MI, RO II PCE, IO PCI'),
         'OUT': ('1110', 'PCO MI, RO II PCE, AO OI'),
         'HLT': ('1111', 'PCO MI, RO II PCE, HLT'),
     }
