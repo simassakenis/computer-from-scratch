@@ -596,7 +596,7 @@ class SRAM:
 
 class SRAMProgrammer:
     def __init__(self, circuit, nbytes, pm_key, a_keys, d_keys, re_key,
-                 a=None, i=None, re=None, ao=None, io=None, reo=None,
+                 a, i, re, ao=None, io=None, reo=None,
                  content=None):
         m = int(math.log2(nbytes))
         assert m == math.log2(nbytes)
@@ -706,14 +706,26 @@ class nBitAdder:
 
 
 class ALU:
-    def __init__(self, circuit, n, a=None, b=None, s=None, we=None, su=None):
+    def __init__(self, circuit, n, a=None, b=None, s=None, we=None,
+                 su=None, clk=None, fe=None, fo=None, freset=None):
         su_branches = Branch1n(circuit=circuit, n=n+1)
         su_xors = [XOR(circuit=circuit, i1=su_branches.o[j]) for j in range(n)]
         adder = nBitAdder(circuit=circuit, b=[su_xors[j].o for j in range(n)],
                           ci=su_branches.o[-1], n=n)
         mbulbs = MultiBulbs(circuit=circuit, i=adder.s, n=n)
         self.bulbs = mbulbs.bulbs
-        we_mswitch = MultiSwitch(circuit=circuit, i=mbulbs.o, n=n)
+        o_branches = [Branch12(circuit=circuit, i=mbulbs.o[j])
+                      for j in range(n)]
+        zf_nots = [NOT(circuit=circuit, i=o_branches[j].o2) for j in range(n)]
+        zf_ands = [AND(circuit=circuit, i1=zf_nots[0].o, i2=zf_nots[1].o)]
+        for j in range(2, n):
+            zf_ands.append(AND(circuit=circuit, i1=zf_nots[j].o,
+                               i2=zf_ands[-1].o))
+        flags_reg = Register(circuit=circuit, i=[adder.co, zf_ands[-1].o], n=2)
+        flags_bulbs = MultiBulbs(circuit=circuit, i=flags_reg.o, n=2)
+        self.fbulbs = flags_bulbs.bulbs
+        we_mswitch = MultiSwitch(circuit=circuit,
+                                 i=[o_branches[j].o1 for j in range(n)], n=n)
         self.a = adder.a
         for j in range(len(self.a)):
             if a is not None and len(a) > j and a[j] is not None:
@@ -737,6 +749,23 @@ class ALU:
         if su is not None:
             self.su.c = su.parent
             su.c = self.su.parent
+        self.clk = flags_reg.clk
+        if clk is not None:
+            self.clk.c = clk.parent
+            clk.c = self.clk.parent
+        self.fe = flags_reg.re
+        if fe is not None:
+            self.fe.c = fe.parent
+            fe.c = self.fe.parent
+        self.fo = flags_bulbs.o
+        for j in range(len(self.fo)):
+            if fo is not None and len(fo) > j and fo[j] is not None:
+                self.fo[j].c = fo[j].parent
+                fo[j].c = self.fo[j].parent
+        self.freset = flags_reg.reset
+        if freset is not None:
+            self.freset.c = freset.parent
+            freset.c = self.freset.parent
 
 
 class Clock:

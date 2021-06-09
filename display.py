@@ -13,6 +13,7 @@ blue = graphics.color_rgb(10, 132, 255),
 teal = graphics.color_rgb(10, 210, 255),
 yellow = graphics.color_rgb(255, 214, 10),
 red = graphics.color_rgb(255, 69, 58),
+indigo = graphics.color_rgb(94, 92, 230),
 
 
 def drawRoundedRect(win, upperLeft, lowerRight, radius, fill):
