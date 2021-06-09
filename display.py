@@ -75,6 +75,24 @@ class ComponentIndicator:
         self.i.setFill(self.color if self.component.state() else black)
 
 
+class DecimalIndicator:
+    def __init__(self, components, display, x, y, color=white, fontsize=32):
+        self.components = components
+
+        self.i = graphics.Text(graphics.Point(x, y), '0000')
+        self.i.setFace('courier')
+        self.i.setSize(fontsize)
+        self.i.setTextColor(color)
+        self.i.setStyle('bold')
+        self.i.draw(display.win)
+
+        self.update()
+
+    def update(self):
+        val = int(''.join([f'{c.state()}' for c in self.components]), 2)
+        self.i.setText(str(val))
+
+
 class Display:
     def __init__(self, width=1600, height=900):
         self.width = width
@@ -85,13 +103,13 @@ class Display:
         self.win.setBackground(lightGray)
         self.inds = []
 
-    def draw_box(self, components, labels, colors, title,
-                 xoffset=0, yoffset=0, sep_after=[]):
+    def draw_box(self, components, title, labels=None, colors=None,
+                 xoffset=0, yoffset=0, sep_after=[], decimal=False):
         hspace = 40
         hspaces = [1.5 if (j + 1) in sep_after else 1
                    for j in range(len(components))]
         hspaces = hspace * np.array([1.5] + hspaces[:-1] + [1.5])
-        width = np.sum(hspaces)
+        width = np.sum(hspaces) if not decimal else 3 * hspace
         height = 100
         x = (self.width / 2) - (width / 2) + xoffset # upper left corner
         y = (self.height / 2) - (height / 2) + yoffset # upper left corner
@@ -99,25 +117,32 @@ class Display:
         drawRoundedRect(win=self.win,
                         upperLeft=graphics.Point(x, y),
                         lowerRight=graphics.Point(x + width, y + height),
-                        radius=16, fill=white)
+                        radius=16, fill=white if not decimal else green)
 
         title = graphics.Text(
             graphics.Point(x + 0.5 * width, y + 0.25 * height),
             title
         )
         title.setFace('courier')
+        title.setTextColor(black if not decimal else white)
         title.setSize(14)
         title.draw(self.win)
 
-        self.inds.extend(
-            [ComponentIndicator(component=c, display=self,
-                                x=x + np.cumsum(hspaces)[i],
-                                y=y + 0.75 * height,
-                                color=colors[i], radius=0.07 * height,
-                                label=labels[i], vspace=0.2 * height,
-                                fontsize=12)
-             for i, c in enumerate(components)]
-        )
+        if not decimal:
+            self.inds.extend(
+                [ComponentIndicator(component=c, display=self,
+                                    x=x + np.cumsum(hspaces)[i],
+                                    y=y + 0.75 * height,
+                                    color=colors[i], radius=0.07 * height,
+                                    label=labels[i], vspace=0.2 * height,
+                                    fontsize=12)
+                 for i, c in enumerate(components)]
+            )
+        else:
+            self.inds.append(
+                DecimalIndicator(components=components, display=self,
+                                 x=x + 0.5 * width, y=y + 0.65 * height)
+            )
 
     def update(self):
         for ind in self.inds:
