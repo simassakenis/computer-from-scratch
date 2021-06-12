@@ -24,44 +24,11 @@ class Branch12:
     def update_right(self, c, val):
         if self.i.val != val:
             self.i.val = val
-            # if self.o1.c is not None:
-            #     self.o1.c.update_right(self, val)
-            # if self.o2.c is not None:
-            #     self.o2.c.update_right(self, val)
-            # return [(self.o1.c, 'r', self, val), (self.o2.c, 'r', self, val)]
             return [(self.o2.c, 'r', self, val), (self.o1.c, 'r', self, val)]
         return []
 
     def update_left(self, c, val):
         assert c == self.o1.c or c == self.o2.c
-        # if c == self.o1.c and self.o1.val != val:
-        #     if self.o1.val == -1:
-        #         if self.o2.c is not None:
-        #             self.o2.c.update_right(self, self.i.val)
-        #     self.o1.val = val
-        #     if val == -1:
-        #         if self.o2.c is not None:
-        #             self.o2.c.update_right(self, 0)
-        #     if self.o1.val == 0 or self.o2.val == 0:
-        #         if self.i.c is not None:
-        #             self.i.c.update_left(self, self.o1.val + self.o2.val)
-        #     else:
-        #         if self.i.c is not None:
-        #             self.i.c.update_left(self, self.o1.val * self.o2.val)
-        # elif c == self.o2.c and self.o2.val != val:
-        #     if self.o2.val == -1:
-        #         if self.o1.c is not None:
-        #             self.o1.c.update_right(self, self.i.val)
-        #     self.o2.val = val
-        #     if val == -1:
-        #         if self.o1.c is not None:
-        #             self.o1.c.update_right(self, 0)
-        #     if self.o1.val == 0 or self.o2.val == 0:
-        #         if self.i.c is not None:
-        #             self.i.c.update_left(self, self.o1.val + self.o2.val)
-        #     else:
-        #         if self.i.c is not None:
-        #             self.i.c.update_left(self, self.o1.val * self.o2.val)
         ret = []
         if c == self.o1.c and self.o1.val != val:
             if self.o1.val == -1:
@@ -99,23 +66,15 @@ class Branch21:
         assert c == self.i1.c or c == self.i2.c
         if c == self.i1.c and self.i1.val != val:
             self.i1.val = val
-            # if self.o.c is not None:
-            #     self.o.c.update_right(self, max(self.i1.val, self.i2.val))
             return [(self.o.c, 'r', self, max(self.i1.val, self.i2.val))]
         elif c == self.i2.c and self.i2.val != val:
             self.i2.val = val
-            # if self.o.c is not None:
-            #     self.o.c.update_right(self, max(self.i1.val, self.i2.val))
             return [(self.o.c, 'r', self, max(self.i1.val, self.i2.val))]
         return []
 
     def update_left(self, c, val):
         if self.o.val != val:
             self.o.val = val
-            # if self.i1.c is not None:
-            #     self.i1.c.update_left(self, self.o.val)
-            # if self.i2.c is not None:
-            #     self.i2.c.update_left(self, self.o.val)
             return [(self.i2.c, 'l', self, val), (self.i1.c, 'l', self, val)]
         return []
 
@@ -126,8 +85,6 @@ class Plus:
         circuit.plusses.append(self)
 
     def update_right(self, c, val):
-        # if self.o.c is not None:
-        #     self.o.c.update_right(self, 1)
         return [(self.o.c, 'r', self, 1)]
 
     def update_left(self, c, val):
@@ -141,8 +98,6 @@ class Minus:
         if i is not None: i.c = self
 
     def update_right(self, c, val):
-        # if self.i.c is not None:
-        #     self.i.c.update_left(self, -val)
         return [(self.i.c, 'l', self, -val)]
 
 
@@ -159,23 +114,17 @@ class Switch:
 
     def toggle(self):
         self.pos = abs(self.pos - 1)
-        # if self.o.c is not None:
-        #     self.o.c.update_right(self, self.i.val * self.pos)
         self.circuit.update_loop([(self.o.c, 'r', self, self.i.val * self.pos)])
 
     def update_right(self, c, val):
         if self.i.val != val:
             self.i.val = val
-            # if self.o.c is not None:
-            #     self.o.c.update_right(self, self.i.val * self.pos)
             return [(self.o.c, 'r', self, self.i.val * self.pos)]
         return[]
 
     def update_left(self, c, val):
         if self.o.val != val:
             self.o.val = val
-            # if self.i.c is not None:
-            #     self.i.c.update_left(self, self.o.val * self.pos)
             return [(self.i.c, 'l', self, self.o.val * self.pos)]
         return[]
 
@@ -199,16 +148,12 @@ class Bulb:
     def update_right(self, c, val):
         if self.i.val != val:
             self.i.val = val
-            # if self.o.c is not None:
-            #     self.o.c.update_right(self, val)
             return [(self.o.c, 'r', self, val)]
         return[]
 
     def update_left(self, c, val):
         if self.o.val != val:
             self.o.val = val
-            # if self.i.c is not None:
-            #     self.i.c.update_left(self, abs(val))
             return [(self.i.c, 'l', self, abs(val))]
         return[]
 
@@ -229,30 +174,16 @@ class Transistor:
         assert c == self.i.c or c == self.switch.c
         if c == self.i.c and self.i.val != val:
             self.i.val = val
-            # if self.o.c is not None:
-            #     self.o.c.update_right(self, self.i.val * self.switch.val)
             return [(self.o.c, 'r', self, self.i.val * self.switch.val)]
         elif c == self.switch.c and self.switch.val != val:
             self.switch.val = val
-            # if self.switch.c is not None:
-            #     self.switch.c.update_left(self, 1)
-            # if self.o.c is not None:
-            #     self.o.c.update_right(self, self.i.val * self.switch.val)
-            # return [(self.switch.c, 'l', self, 1),
-            #         (self.o.c, 'r', self, self.i.val * self.switch.val)]
             return [(self.o.c, 'r', self, self.i.val * self.switch.val),
                     (self.switch.c, 'l', self, 1)]
         return []
 
     def update_left(self, c, val):
         self.o.val = val
-        # if self.i.c is not None:
-        #     self.i.c.update_left(self, self.o.val * self.switch.val)
         return [(self.i.c, 'l', self, self.o.val * self.switch.val)]
-        # if self.o.val != val:
-        #     self.o.val = val
-        #     return [(self.i.c, 'l', self, self.o.val * self.switch.val)]
-        # return[]
 
     def state(self):
         return abs(self.i.val * self.o.val * self.switch.val)
@@ -1021,8 +952,6 @@ class Circuit:
 
     def initialize(self):
         # initialize circuit
-        # for p in self.plusses:
-        #     p.update_right(None, None)
         self.update_loop([(p, 'r', None, None) for p in self.plusses[::-1]])
         # program SRAMs if requested
         for sp in self.sram_programmers:
