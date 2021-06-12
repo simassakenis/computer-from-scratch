@@ -1063,6 +1063,7 @@ class Circuit:
             ret = (component.update_right(sender, value) if mode == 'r' else
                    component.update_left(sender, value))
             self.update_stack = ret + self.update_stack
+            print('right' if mode == 'r' else 'left', component)
             # updated.append(component)
             # if len(updated) % 1000 == 0:
             #     print('***', len(updated))

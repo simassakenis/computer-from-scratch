@@ -556,6 +556,7 @@ if __name__ == '__main__':
         '1111': '00001110',
     }
 
+    print('******-')
     circuit.initialize()
     display = Display()
     display.draw_box(
