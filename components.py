@@ -1,6 +1,5 @@
 import time
 import math
-import collections
 
 
 # Lowest-level components
@@ -29,7 +28,8 @@ class Branch12:
             #     self.o1.c.update_right(self, val)
             # if self.o2.c is not None:
             #     self.o2.c.update_right(self, val)
-            return [(self.o1.c, 'r', self, val), (self.o2.c, 'r', self, val)]
+            # return [(self.o1.c, 'r', self, val), (self.o2.c, 'r', self, val)]
+            return [(self.o2.c, 'r', self, val), (self.o1.c, 'r', self, val)]
         return []
 
     def update_left(self, c, val):
@@ -83,7 +83,7 @@ class Branch12:
                 ret.append((self.i.c, 'l', self, self.o1.val + self.o2.val))
             else:
                 ret.append((self.i.c, 'l', self, self.o1.val * self.o2.val))
-        return ret
+        return ret[::-1]
 
 
 class Branch21:
@@ -116,7 +116,7 @@ class Branch21:
             #     self.i1.c.update_left(self, self.o.val)
             # if self.i2.c is not None:
             #     self.i2.c.update_left(self, self.o.val)
-            return [(self.i1.c, 'l', self, val), (self.i2.c, 'l', self, val)]
+            return [(self.i2.c, 'l', self, val), (self.i1.c, 'l', self, val)]
         return []
 
 
@@ -238,8 +238,10 @@ class Transistor:
             #     self.switch.c.update_left(self, 1)
             # if self.o.c is not None:
             #     self.o.c.update_right(self, self.i.val * self.switch.val)
-            return [(self.switch.c, 'l', self, 1),
-                    (self.o.c, 'r', self, self.i.val * self.switch.val)]
+            # return [(self.switch.c, 'l', self, 1),
+            #         (self.o.c, 'r', self, self.i.val * self.switch.val)]
+            return [(self.o.c, 'r', self, self.i.val * self.switch.val),
+                    (self.switch.c, 'l', self, 1)]
         return []
 
     def update_left(self, c, val):
@@ -1021,7 +1023,7 @@ class Circuit:
         # initialize circuit
         # for p in self.plusses:
         #     p.update_right(None, None)
-        self.update_loop([(p, 'r', None, None) for p in self.plusses])
+        self.update_loop([(p, 'r', None, None) for p in self.plusses[::-1]])
         # program SRAMs if requested
         for sp in self.sram_programmers:
             if sp.content is None:
@@ -1054,19 +1056,12 @@ class Circuit:
     def update_loop(self, updates=[]):
         assert len(self.update_stack) == 0
         self.update_stack.extend(updates)
-        updated = []
         while len(self.update_stack) > 0:
-            component, mode, sender, value = self.update_stack.pop(0)
+            component, mode, sender, value = self.update_stack.pop()
             if component is None:
                 continue
             assert mode == 'r' or mode == 'l'
             ret = (component.update_right(sender, value) if mode == 'r' else
                    component.update_left(sender, value))
-            self.update_stack = ret + self.update_stack
-            print('right' if mode == 'r' else 'left', component)
-            # updated.append(component)
-            # if len(updated) % 1000 == 0:
-            #     print('***', len(updated))
-            #     for c in collections.Counter(updated).most_common()[:10]:
-            #         print(c)
+            self.update_stack.extend(ret)
 
