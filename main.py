@@ -832,102 +832,102 @@ if __name__ == '__main__':
 
     circuit.initialize()
     display = Display()
-    # display.draw_box(
-    #     components=bus.bulbs[::-1], labels=[f'B{j+1}' for j in range(8)][::-1],
-    #     colors=[green for _ in range(8)], title='Bus',
-    #     xoffset=-400, yoffset=-300
-    # )
-    # display.draw_box(
-    #     components=([clock.bulb, regM_re_switch]
-    #                 + regM.bulbs[::-1]),
-    #     labels=['CLK', 'RE'] + [f'D{j+1}' for j in range(4)][::-1],
-    #     colors=[blue, yellow] + [green for _ in range(4)],
-    #     title='Memory address register', sep_after=[2],
-    #     xoffset=-400, yoffset=-180
-    # )
-    # display.draw_box(
-    #     components=([sram_prog.pm_switch, sram_prog.re_switch]
-    #                 + sram_prog.a_switches.switches[::-1]
-    #                 + sram_prog.d_switches.switches[::-1]),
-    #     labels=(['PM', 'RE']
-    #             + [f'A{j+1}' for j in range(4)][::-1]
-    #             + [f'D{j+1}' for j in range(8)][::-1]),
-    #     colors=[red, yellow] + [teal] * 4 + [green] * 8,
-    #     title='SRAM programmer', sep_after=[1, 2, 6],
-    #     xoffset=-400, yoffset=-60
-    # )
-    # display.draw_box(
-    #     components=([sram_re_switch, sram_we_switch, sram_prog.pm_switch]
-    #                 + sram.addr_bulbs[::-1]
-    #                 + sram.bulbs[::-1]),
-    #     labels=(['RE', 'WE', 'PM']
-    #             + [f'A{j+1}' for j in range(4)][::-1]
-    #             + [f'R{j+1}' for j in range(8)][::-1]),
-    #     colors=[yellow, yellow, red] + [teal] * 4 + [green] * 8, title='SRAM',
-    #     sep_after=[2, 3, 7], xoffset=-400, yoffset=60
-    # )
-    # display.draw_box(
-    #     components=([clock.bulb, regI_re_switch, regI_we_switch]
-    #                 + regI.bulbs[::-1]),
-    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
-    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
-    #     title='Instruction Register', sep_after=[3], xoffset=-400, yoffset=180
-    # )
-    # display.draw_box(
-    #     components=([clock.bulb, ce_switch, je_switch, co_switch]
-    #                 + prog_ctr.bulbs[::-1]),
-    #     labels=['CLK', 'CE', 'JE', 'CO'] + [f'O{j+1}' for j in range(4)][::-1],
-    #     colors=[blue, yellow, yellow, yellow] + [green] * 4,
-    #     title='Program counter', sep_after=[1, 4], xoffset=400, yoffset=-300
-    # )
-    # display.draw_box(
-    #     components=([clock.bulb, regA_re_switch, regA_we_switch]
-    #                 + regA.bulbs[::-1]),
-    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)][::-1],
-    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
-    #     title='Register A', sep_after=[3], xoffset=400, yoffset=-180
-    # )
-    # display.draw_box(
-    #     components=([alu_we_switch, alu_su_switch]
-    #                 + alu.bulbs[::-1]
-    #                 + alu.fbulbs),
-    #     labels=(['WE', 'SU']
-    #             + [f'S{j+1}' for j in range(8)][::-1]
-    #             + ['CF', 'ZF']),
-    #     colors=[yellow, yellow] + [green for _ in range(8)] + [indigo] * 2,
-    #     title='ALU', sep_after=[2, 10], xoffset=400, yoffset=-60
-    # )
-    # display.draw_box(
-    #     components=([clock.bulb, regB_re_switch, regB_we_switch]
-    #                 + regB.bulbs[::-1]),
-    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
-    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
-    #     title='Register B', sep_after=[3], xoffset=400, yoffset=60
-    # )
-    # display.draw_box(
-    #     components=([clock.bulb, regC_re_switch, regC_we_switch]
-    #                 + regC.bulbs[::-1]),
-    #     labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
-    #     colors=[blue, yellow, yellow] + [green for _ in range(8)],
-    #     title='Register C', sep_after=[3], xoffset=400, yoffset=180
-    # )
-    # display.draw_box(
-    #     components=regO.bulbs[::-1], title='Output',
-    #     xoffset=600, yoffset=300, decimal=True
-    # )
-    # display.draw_box(
-    #     components=([reset_switch]
-    #                 + ctrl_srams[0].addr_bulbs[::-1]
-    #                 + sum([ctrl_srams[i].bulbs[::-1]
-    #                        for i in range(nctrl_srams)], [])[:len(controls)]),
-    #     labels=(['RS']
-    #             + ['S1', 'S2', 'S3', 'I1', 'I2', 'I3', 'I4', 'CF', 'ZF'][::-1]
-    #             + ctrl_labels),
-    #     colors=([red]
-    #             + [teal] * len(ctrl_srams[0].addr_bulbs)
-    #             + [yellow] * len(controls)),
-    #     title='Controller', sep_after=[1, 10], xoffset=-120, yoffset=300
-    # )
+    display.draw_box(
+        components=bus.bulbs[::-1], labels=[f'B{j+1}' for j in range(8)][::-1],
+        colors=[green for _ in range(8)], title='Bus',
+        xoffset=-400, yoffset=-300
+    )
+    display.draw_box(
+        components=([clock.bulb, regM_re_switch]
+                    + regM.bulbs[::-1]),
+        labels=['CLK', 'RE'] + [f'D{j+1}' for j in range(4)][::-1],
+        colors=[blue, yellow] + [green for _ in range(4)],
+        title='Memory address register', sep_after=[2],
+        xoffset=-400, yoffset=-180
+    )
+    display.draw_box(
+        components=([sram_prog.pm_switch, sram_prog.re_switch]
+                    + sram_prog.a_switches.switches[::-1]
+                    + sram_prog.d_switches.switches[::-1]),
+        labels=(['PM', 'RE']
+                + [f'A{j+1}' for j in range(4)][::-1]
+                + [f'D{j+1}' for j in range(8)][::-1]),
+        colors=[red, yellow] + [teal] * 4 + [green] * 8,
+        title='SRAM programmer', sep_after=[1, 2, 6],
+        xoffset=-400, yoffset=-60
+    )
+    display.draw_box(
+        components=([sram_re_switch, sram_we_switch, sram_prog.pm_switch]
+                    + sram.addr_bulbs[::-1]
+                    + sram.bulbs[::-1]),
+        labels=(['RE', 'WE', 'PM']
+                + [f'A{j+1}' for j in range(4)][::-1]
+                + [f'R{j+1}' for j in range(8)][::-1]),
+        colors=[yellow, yellow, red] + [teal] * 4 + [green] * 8, title='SRAM',
+        sep_after=[2, 3, 7], xoffset=-400, yoffset=60
+    )
+    display.draw_box(
+        components=([clock.bulb, regI_re_switch, regI_we_switch]
+                    + regI.bulbs[::-1]),
+        labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
+        colors=[blue, yellow, yellow] + [green for _ in range(8)],
+        title='Instruction Register', sep_after=[3], xoffset=-400, yoffset=180
+    )
+    display.draw_box(
+        components=([clock.bulb, ce_switch, je_switch, co_switch]
+                    + prog_ctr.bulbs[::-1]),
+        labels=['CLK', 'CE', 'JE', 'CO'] + [f'O{j+1}' for j in range(4)][::-1],
+        colors=[blue, yellow, yellow, yellow] + [green] * 4,
+        title='Program counter', sep_after=[1, 4], xoffset=400, yoffset=-300
+    )
+    display.draw_box(
+        components=([clock.bulb, regA_re_switch, regA_we_switch]
+                    + regA.bulbs[::-1]),
+        labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)][::-1],
+        colors=[blue, yellow, yellow] + [green for _ in range(8)],
+        title='Register A', sep_after=[3], xoffset=400, yoffset=-180
+    )
+    display.draw_box(
+        components=([alu_we_switch, alu_su_switch]
+                    + alu.bulbs[::-1]
+                    + alu.fbulbs),
+        labels=(['WE', 'SU']
+                + [f'S{j+1}' for j in range(8)][::-1]
+                + ['CF', 'ZF']),
+        colors=[yellow, yellow] + [green for _ in range(8)] + [indigo] * 2,
+        title='ALU', sep_after=[2, 10], xoffset=400, yoffset=-60
+    )
+    display.draw_box(
+        components=([clock.bulb, regB_re_switch, regB_we_switch]
+                    + regB.bulbs[::-1]),
+        labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
+        colors=[blue, yellow, yellow] + [green for _ in range(8)],
+        title='Register B', sep_after=[3], xoffset=400, yoffset=60
+    )
+    display.draw_box(
+        components=([clock.bulb, regC_re_switch, regC_we_switch]
+                    + regC.bulbs[::-1]),
+        labels=['CLK', 'RE', 'WE'] + [f'D{j+1}' for j in range(8)],
+        colors=[blue, yellow, yellow] + [green for _ in range(8)],
+        title='Register C', sep_after=[3], xoffset=400, yoffset=180
+    )
+    display.draw_box(
+        components=regO.bulbs[::-1], title='Output',
+        xoffset=600, yoffset=300, decimal=True
+    )
+    display.draw_box(
+        components=([reset_switch]
+                    + ctrl_srams[0].addr_bulbs[::-1]
+                    + sum([ctrl_srams[i].bulbs[::-1]
+                           for i in range(nctrl_srams)], [])[:len(controls)]),
+        labels=(['RS']
+                + ['S1', 'S2', 'S3', 'I1', 'I2', 'I3', 'I4', 'CF', 'ZF'][::-1]
+                + ctrl_labels),
+        colors=([red]
+                + [teal] * len(ctrl_srams[0].addr_bulbs)
+                + [yellow] * len(controls)),
+        title='Controller', sep_after=[1, 10], xoffset=-120, yoffset=300
+    )
 
     # display.draw_box(
     #     components=regO.bulbs[::-1], title='Output',
