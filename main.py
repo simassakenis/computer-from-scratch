@@ -488,14 +488,14 @@ if __name__ == '__main__':
     sram_re_and = AND(circuit=circuit, i1=clock_branch.o[1],
                       i2=sram_re_switch.o)
     sram_prog = SRAMProgrammer(
-        circuit=circuit, nbytes=128, pm_key='v', a_keys=['R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+        circuit=circuit, nbytes=256, pm_key='v', a_keys=['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
         d_keys = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'], re_key='L',
         a=regM_we.o + [None] * 4, i=bus.add_read(), re=sram_re_and.o
     )
     sram_we_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='w')
     sram = SRAM(circuit=circuit, a=sram_prog.ao, i=sram_prog.io,
                 re=sram_prog.reo, we=sram_we_switch.o, o=bus.add_write(),
-                nbytes=128)
+                nbytes=256)
 
     regI_re_switch = Switch(circuit=circuit, i=circuit.add_plus().o, key='k')
     regI = Register(circuit=circuit, i=bus.add_read(), re=regI_re_switch.o,
