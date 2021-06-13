@@ -12,14 +12,33 @@ class Leg:
         self.val = 0 # value of this leg
 
 
+def init_legs(component, locals_dict, leg_names):
+    for key, value in locals_dict.items():
+        if key in leg_names:
+            if value is None:
+                setattr(component, key, Leg(component))
+            else:
+                setattr(component, key, Leg(component, value.parent))
+                value.c = component
+
+
+def connect_legs(component, locals_dict, leg_names):
+    for key, value in locals_dict.items():
+        if key in leg_names and value is not None:
+            leg = getattr(component, key)
+            if isinstance(leg, list):
+                for j in range(len(leg)):
+                    if len(value) > j and value[j] is not None:
+                        leg[j].c = value[j].parent
+                        value[j].c = leg[j].parent
+            else:
+                leg.c = value.parent
+                value.c = leg.parent
+
+
 class Branch12:
     def __init__(self, circuit, i=None, o1=None, o2=None):
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o1 = Leg(self, o1.parent if o1 is not None else None)
-        if o1 is not None: o1.c = self
-        self.o2 = Leg(self, o2.parent if o2 is not None else None)
-        if o2 is not None: o2.c = self
+        init_legs(self, locals(), ['i', 'o1', 'o2'])
 
     def update_right(self, c, val):
         if self.i.val != val:
@@ -55,12 +74,7 @@ class Branch12:
 
 class Branch21:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        self.i1 = Leg(self, i1.parent if i1 is not None else None)
-        if i1 is not None: i1.c = self
-        self.i2 = Leg(self, i2.parent if i2 is not None else None)
-        if i2 is not None: i2.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
+        init_legs(self, locals(), ['i1', 'i2', 'o'])
 
     def update_right(self, c, val):
         assert c == self.i1.c or c == self.i2.c
@@ -80,22 +94,20 @@ class Branch21:
 
 
 class Plus:
-    def __init__(self, circuit):
-        self.o = Leg(self)
+    def __init__(self, circuit, o=None):
+        init_legs(self, locals(), ['o'])
         circuit.plusses.append(self)
 
     def update_right(self, c, val):
         return [(self.o.c, 'r', self, 1)]
 
     def update_left(self, c, val):
-        # pass
         return []
 
 
 class Minus:
     def __init__(self, circuit, i=None):
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
+        init_legs(self, locals(), ['i'])
 
     def update_right(self, c, val):
         return [(self.i.c, 'l', self, -val)]
@@ -103,10 +115,7 @@ class Minus:
 
 class Switch:
     def __init__(self, circuit, i=None, o=None, key=None):
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
+        init_legs(self, locals(), ['i', 'o'])
         self.key = key
         self.pos = 0
         self.circuit = circuit
@@ -140,10 +149,7 @@ class Switch:
 
 class Bulb:
     def __init__(self, circuit, i=None, o=None):
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
+        init_legs(self, locals(), ['i', 'o'])
         
     def update_right(self, c, val):
         if self.i.val != val:
@@ -163,12 +169,7 @@ class Bulb:
 
 class Transistor:
     def __init__(self, circuit, switch=None, i=None, o=None):
-        self.switch = Leg(self, switch.parent if switch is not None else None)
-        if switch is not None: switch.c = self
-        self.i = Leg(self, i.parent if i is not None else None)
-        if i is not None: i.c = self
-        self.o = Leg(self, o.parent if o is not None else None)
-        if o is not None: o.c = self
+        init_legs(self, locals(), ['switch', 'i', 'o'])
 
     def update_right(self, c, val):
         assert c == self.i.c or c == self.switch.c
@@ -195,16 +196,11 @@ class Transistor:
 class NOT:
     def __init__(self, circuit, i=None, o=None):
         branch = Branch12(circuit=circuit, i=circuit.add_plus().o)
-        self.transistor = Transistor(circuit=circuit, i=branch.o2,
-                                     o=circuit.add_minus().i)
-        self.i = self.transistor.switch
-        if i is not None:
-            self.i.c = i.parent
-            i.c = self.i.parent
+        transistor = Transistor(circuit=circuit, i=branch.o2,
+                                o=circuit.add_minus().i)
+        self.i = transistor.switch
         self.o = branch.o1
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
+        connect_legs(self, locals(), ['i', 'o'])
 
 
 class AND:
@@ -212,17 +208,9 @@ class AND:
         transistor1 = Transistor(circuit=circuit, i=circuit.add_plus().o)
         transistor2 = Transistor(circuit=circuit, i=transistor1.o)
         self.i1 = transistor1.switch
-        if i1 is not None:
-            self.i1.c = i1.parent
-            i1.c = self.i1.parent
         self.i2 = transistor2.switch
-        if i2 is not None:
-            self.i2.c = i2.parent
-            i2.c = self.i2.parent
         self.o = transistor2.o
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
+        connect_legs(self, locals(), ['i1', 'i2', 'o'])
 
 
 class OR:
@@ -232,17 +220,9 @@ class OR:
         self.transistor1 = Transistor(circuit=circuit, i=branch12.o1, o=branch21.i1)
         self.transistor2 = Transistor(circuit=circuit, i=branch12.o2, o=branch21.i2)
         self.i1 = self.transistor1.switch
-        if i1 is not None:
-            self.i1.c = i1.parent
-            i1.c = self.i1.parent
         self.i2 = self.transistor2.switch
-        if i2 is not None:
-            self.i2.c = i2.parent
-            i2.c = self.i2.parent
         self.o = branch21.o
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
+        connect_legs(self, locals(), ['i1', 'i2', 'o'])
 
 
 class XOR:
@@ -254,17 +234,9 @@ class XOR:
         or_gate = OR(circuit=circuit, i1=branch121.o2, i2=branch122.o2)
         and_gate2 = AND(circuit=circuit, i1=not_gate.o, i2=or_gate.o)
         self.i1 = branch121.i
-        if i1 is not None:
-            self.i1.c = i1.parent
-            i1.c = self.i1.parent
         self.i2 = branch122.i
-        if i2 is not None:
-            self.i2.c = i2.parent
-            i2.c = self.i2.parent
         self.o = and_gate2.o
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
+        connect_legs(self, locals(), ['i1', 'i2', 'o'])
 
 
 class Branch1n:
@@ -277,34 +249,20 @@ class Branch1n:
             branch = Branch12(circuit=circuit, i=branch.o2)
             self.o.append(branch.o1)
         self.o.append(branch.o2)
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
+        connect_legs(self, locals(), ['i', 'o'])
 
 
 class Branchn1:
     def __init__(self, circuit, n, i=None, o=None):
+        n = max(n, 2)
         branch = Branch21(circuit=circuit)
         self.i = [branch.i1]
         self.o = [branch.o]
-        assert n >= 2
         for _ in range(n - 2):
             branch = Branch21(circuit=circuit, o=branch.i2)
             self.i.append(branch.i1)
         self.i.append(branch.i2)
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
+        connect_legs(self, locals(), ['i', 'o'])
 
 
 class MultiSwitch:
@@ -313,19 +271,9 @@ class MultiSwitch:
         transistors = [Transistor(circuit=circuit, switch=branch.o[j])
                        for j in range(n)]
         self.switch = branch.i[0]
-        if switch is not None:
-            self.switch.c = switch.parent
-            switch.c = self.switch.parent
         self.i = [transistors[j].i for j in range(n)]
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
         self.o = [transistors[j].o for j in range(n)]
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
+        connect_legs(self, locals(), ['switch', 'i', 'o'])
 
 
 class MultiBulbs:
@@ -336,15 +284,8 @@ class MultiBulbs:
                            o=circuit.add_minus().i)
                       for j in range(n)]
         self.i = [branches[j].i for j in range(n)]
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
         self.o = [branches[j].o2 for j in range(n)]
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
+        connect_legs(self, locals(), ['i', 'o'])
 
 
 class ManualSwitches:
@@ -358,10 +299,7 @@ class ManualSwitches:
         we = MultiSwitch(circuit=circuit, switch=self.we_switch.o,
                          i=[self.switches[j].o for j in range(n)], n=n)
         self.o = we.o
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
+        connect_legs(self, locals(), ['o'])
 
 
 class SRLatch:
@@ -371,17 +309,9 @@ class SRLatch:
         and_gate = AND(circuit=circuit, i1=or_gate.o, i2=not_gate.o)
         branch = Branch12(circuit=circuit, i=and_gate.o, o2=or_gate.i1)
         self.s = or_gate.i2
-        if s is not None:
-            self.s.c = s.parent
-            s.c = self.s.parent
         self.r = not_gate.i
-        if r is not None:
-            self.r.c = r.parent
-            r.c = self.r.parent
         self.o = branch.o1
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
+        connect_legs(self, locals(), ['s', 'r', 'o'])
 
 
 class DLatch:
@@ -400,21 +330,10 @@ class DLatch:
         and_gate2 = AND(circuit=circuit, i1=or_gate.o, i2=not_gate2.o)
         branch123 = Branch12(circuit=circuit, i=and_gate2.o, o2=or_gate.i1)
         self.i1 = reset_transistor.i
-        if i1 is not None:
-            self.i1.c = i1.parent
-            i1.c = self.i1.parent
         self.i2 = we_or_gate.i1
-        if i2 is not None:
-            self.i2.c = i2.parent
-            i2.c = self.i2.parent
         self.o = branch123.o1
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
         self.reset = reset_branch.i
-        if reset is not None:
-            self.reset.c = reset.parent
-            reset.c = self.reset.parent
+        connect_legs(self, locals(), ['i1', 'i2', 'o', 'reset'])
 
 
 class Register:
@@ -430,27 +349,11 @@ class Register:
                             i=[dlatches[j].o for j in range(n)], n=n)
         self.bulbs = mbulbs.bulbs
         self.i = [dlatches[j].i1 for j in range(n)]
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
         self.o = mbulbs.o
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
         self.re = re_and.i1
-        if re is not None:
-            self.re.c = re.parent
-            re.c = self.re.parent
         self.clk = re_and.i2
-        if clk is not None:
-            self.clk.c = clk.parent
-            clk.c = self.clk.parent
         self.reset = reset_branch.i[0]
-        if reset is not None:
-            self.reset.c = reset.parent
-            reset.c = self.reset.parent
+        connect_legs(self, locals(), ['i', 'o', 're', 'clk', 'reset'])
 
 
 class Decoder:
@@ -477,14 +380,7 @@ class Decoder:
                                        switch=branches[-1].o2, n=n//2)
             self.i = [branches[j].i for j in range(m)]
             self.o = mswitch_low.o + mswitch_high.o
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
+        connect_legs(self, locals(), ['i', 'o'])
 
 
 class Selector:
@@ -502,24 +398,10 @@ class Selector:
                            i2=we_branch.o[j])
                     for j in range(n)]
         self.a = a_mswitch.i
-        for j in range(len(self.a)):
-            if a is not None and len(a) > j and a[j] is not None:
-                self.a[j].c = a[j].parent
-                a[j].c = self.a[j].parent
         self.b = b_mswitch.i
-        for j in range(len(self.b)):
-            if b is not None and len(b) > j and b[j] is not None:
-                self.b[j].c = b[j].parent
-                b[j].c = self.b[j].parent
         self.o = [dlatches[j].o for j in range(n)]
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
         self.s = s_branch.i[0]
-        if s is not None:
-            self.s.c = s.parent
-            s.c = self.s.parent
+        connect_legs(self, locals(), ['a', 'b', 'o', 's'])
 
 
 class SRAM:
@@ -555,28 +437,11 @@ class SRAM:
         self.bulbs = o_mbulbs.bulbs
         we_mswitch = MultiSwitch(circuit=circuit, i=o_mbulbs.o, n=8)
         self.a = addr_bulbs.i
-        for j in range(len(self.a)):
-            if a is not None and len(a) > j and a[j] is not None:
-                self.a[j].c = a[j].parent
-                a[j].c = self.a[j].parent
         self.i = [d_branches[j].i[0] for j in range(8)]
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
         self.o = we_mswitch.o
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
         self.re = re_mswitch.switch
-        if re is not None:
-            self.re.c = re.parent
-            re.c = self.re.parent
         self.we = we_mswitch.switch
-        if we is not None:
-            self.we.c = we.parent
-            we.c = self.we.parent
+        connect_legs(self, locals(), ['a', 'i', 'o', 're', 'we'])
 
 
 class SRAMProgrammer:
@@ -603,19 +468,9 @@ class SRAMProgrammer:
             n=m + 8 + 1
         )
         self.ao = selector.o[:m]
-        for j in range(len(self.ao)):
-            if ao is not None and len(ao) > j and ao[j] is not None:
-                self.ao[j].c = ao[j].parent
-                ao[j].c = self.ao[j].parent
         self.io = selector.o[m:m+8]
-        for j in range(len(self.io)):
-            if io is not None and len(io) > j and io[j] is not None:
-                self.io[j].c = io[j].parent
-                io[j].c = self.io[j].parent
         self.reo = selector.o[-1]
-        if reo is not None:
-            self.reo.c = reo.parent
-            reo.c = self.reo.parent
+        connect_legs(self, locals(), ['ao', 'io', 'reo'])
 
         self.pm_key = pm_key
         self.a_keys = a_keys
@@ -637,25 +492,11 @@ class FullAdder:
         and_gate2 = AND(circuit=circuit, i1=branch12xor.o2, i2=branch12c.o2)
         or_gate = OR(circuit=circuit, i1=and_gate1.o, i2=and_gate2.o)
         self.a = branch12a.i
-        if a is not None:
-            self.a.c = a.parent
-            a.c = self.a.parent
         self.b = branch12b.i
-        if b is not None:
-            self.b.c = b.parent
-            b.c = self.b.parent
         self.ci = branch12c.i
-        if ci is not None:
-            self.ci.c = ci.parent
-            ci.c = self.ci.parent
         self.s = xor_gate2.o
-        if s is not None:
-            self.s.c = s.parent
-            s.c = self.s.parent
         self.co = or_gate.o
-        if co is not None:
-            self.co.c = co.parent
-            co.c = self.co.parent
+        connect_legs(self, locals(), ['a', 'b', 'ci', 's', 'co'])
 
 
 class nBitAdder:
@@ -666,28 +507,11 @@ class nBitAdder:
                               ci=None if j == 0 else adders[-1].co)
             adders.append(adder)
         self.a = [adders[j].a for j in range(n)]
-        for j in range(len(self.a)):
-            if a is not None and len(a) > j and a[j] is not None:
-                self.a[j].c = a[j].parent
-                a[j].c = self.a[j].parent
         self.b = [adders[j].b for j in range(n)]
-        for j in range(len(self.b)):
-            if b is not None and len(b) > j and b[j] is not None:
-                self.b[j].c = b[j].parent
-                b[j].c = self.b[j].parent
         self.ci = adders[0].ci
-        if ci is not None:
-            self.ci.c = ci.parent
-            ci.c = self.ci.parent
         self.s = [adders[j].s for j in range(n)]
-        for j in range(len(self.s)):
-            if s is not None and len(s) > j and s[j] is not None:
-                self.s[j].c = s[j].parent
-                s[j].c = self.s[j].parent
         self.co = adders[-1].co
-        if co is not None:
-            self.co.c = co.parent
-            co.c = self.co.parent
+        connect_legs(self, locals(), ['a', 'b', 'ci', 's', 'co'])
 
 
 class ALU:
@@ -712,45 +536,16 @@ class ALU:
         we_mswitch = MultiSwitch(circuit=circuit,
                                  i=[o_branches[j].o1 for j in range(n)], n=n)
         self.a = adder.a
-        for j in range(len(self.a)):
-            if a is not None and len(a) > j and a[j] is not None:
-                self.a[j].c = a[j].parent
-                a[j].c = self.a[j].parent
         self.b = [su_xors[j].i2 for j in range(n)]
-        for j in range(len(self.b)):
-            if b is not None and len(b) > j and b[j] is not None:
-                self.b[j].c = b[j].parent
-                b[j].c = self.b[j].parent
         self.s = we_mswitch.o
-        for j in range(len(self.s)):
-            if s is not None and len(s) > j and s[j] is not None:
-                self.s[j].c = s[j].parent
-                s[j].c = self.s[j].parent
         self.we = we_mswitch.switch
-        if we is not None:
-            self.we.c = we.parent
-            we.c = self.we.parent
         self.su = su_branches.i[0]
-        if su is not None:
-            self.su.c = su.parent
-            su.c = self.su.parent
         self.clk = flags_reg.clk
-        if clk is not None:
-            self.clk.c = clk.parent
-            clk.c = self.clk.parent
         self.fe = flags_reg.re
-        if fe is not None:
-            self.fe.c = fe.parent
-            fe.c = self.fe.parent
         self.fo = flags_bulbs.o
-        for j in range(len(self.fo)):
-            if fo is not None and len(fo) > j and fo[j] is not None:
-                self.fo[j].c = fo[j].parent
-                fo[j].c = self.fo[j].parent
         self.freset = flags_reg.reset
-        if freset is not None:
-            self.freset.c = freset.parent
-            freset.c = self.freset.parent
+        connect_legs(self, locals(),
+                     ['a', 'b', 's', 'we', 'su', 'clk', 'fe', 'fo', 'freset'])
 
 
 class Clock:
@@ -770,17 +565,9 @@ class Clock:
                             i=[self.switch.o, self.edge_switch.o], n=2)
         self.bulb = mbulbs.bulbs[0]
         self.hlt = hlt_not.i
-        if hlt is not None:
-            self.hlt.c = hlt.parent
-            hlt.c = self.hlt.parent
         self.o1 = mbulbs.o[0]
-        if o1 is not None:
-            self.o1.c = o1.parent
-            o1.c = self.o1.parent
         self.o2 = mbulbs.o[1]
-        if o2 is not None:
-            self.o2.c = o2.parent
-            o2.c = self.o2.parent
+        connect_legs(self, locals(), ['hlt', 'o1', 'o2'])
         circuit.clocks.append(self)
 
     def update(self, key):
@@ -827,25 +614,11 @@ class ClockDivider:
                              o=[None, None, d1_selector.a[0]], n=3)
         o2_not = NOT(circuit=circuit, i=o2_branch.o[1], o=d1_selector.b[0])
         self.clk = clk_branch.i[0]
-        if clk is not None:
-            self.clk.c = clk.parent
-            clk.c = self.clk.parent
         self.i = d2_selector.a[0]
-        if i is not None:
-            self.i.c = i.parent
-            i.c = self.i.parent
         self.o = o2_branch.o[0]
-        if o is not None:
-            self.o.c = o.parent
-            o.c = self.o.parent
         self.je = je_branch.i[0]
-        if je is not None:
-            self.je.c = je.parent
-            je.c = self.je.parent
         self.we = we_branch.i
-        if we is not None:
-            self.we.c = we.parent
-            we.c = self.we.parent
+        connect_legs(self, locals(), ['clk', 'i', 'o', 'je', 'we'])
 
 
 class BinaryCounter:
@@ -883,35 +656,14 @@ class BinaryCounter:
         self.bulbs = o_bulbs.bulbs
         co_mswitch = MultiSwitch(circuit=circuit, i=o_bulbs.o, n=n)
         self.clk = reset_clk_or.i1
-        if clk is not None:
-            self.clk.c = clk.parent
-            clk.c = self.clk.parent
         self.i = reset_i_mswitch.i
-        for j in range(len(self.i)):
-            if i is not None and len(i) > j and i[j] is not None:
-                self.i[j].c = i[j].parent
-                i[j].c = self.i[j].parent
         self.o = co_mswitch.o
-        for j in range(len(self.o)):
-            if o is not None and len(o) > j and o[j] is not None:
-                self.o[j].c = o[j].parent
-                o[j].c = self.o[j].parent
         self.ce = ce_or.i1
-        if ce is not None:
-            self.ce.c = ce.parent
-            ce.c = self.ce.parent
         self.je = reset_je_or.i1
-        if je is not None:
-            self.je.c = je.parent
-            je.c = self.je.parent
         self.co = co_mswitch.switch
-        if co is not None:
-            self.co.c = co.parent
-            co.c = self.co.parent
         self.reset = reset_branch.i[0]
-        if reset is not None:
-            self.reset.c = reset.parent
-            reset.c = self.reset.parent
+        connect_legs(self, locals(),
+                     ['clk', 'i', 'o', 'ce', 'je', 'co', 'reset'])
 
 
 class Bus:
@@ -990,7 +742,8 @@ class Circuit:
             if component is None:
                 continue
             assert mode == 'r' or mode == 'l'
-            ret = (component.update_right(sender, value) if mode == 'r' else
-                   component.update_left(sender, value))
-            self.update_stack.extend(ret)
+            self.update_stack.extend(
+                component.update_right(sender, value) if mode == 'r' else
+                component.update_left(sender, value)
+            )
 
