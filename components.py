@@ -2,14 +2,7 @@ import time
 import math
 
 
-# Lowest-level components
-
-
-class Leg:
-    def __init__(self, parent, c=None):
-        self.parent = parent # component whose leg this leg is
-        self.c = c # component that this leg is connected to
-        self.val = 0 # value of this leg
+# Helpers
 
 
 def init_legs(component, locals_dict, leg_names):
@@ -34,6 +27,36 @@ def connect_legs(component, locals_dict, leg_names):
             else:
                 leg.c = value.parent
                 value.c = leg.parent
+
+
+# Lowest-level components
+
+
+class Leg:
+    def __init__(self, parent, c=None):
+        self.parent = parent # component whose leg this leg is
+        self.c = c # component that this leg is connected to
+        self.val = 0 # value of this leg
+
+
+class Plus:
+    def __init__(self, circuit, o=None):
+        init_legs(self, locals(), ['o'])
+        circuit.plusses.append(self)
+
+    def update_right(self, c, val):
+        return [(self.o.c, 'r', self, 1)]
+
+    def update_left(self, c, val):
+        return []
+
+
+class Minus:
+    def __init__(self, circuit, i=None):
+        init_legs(self, locals(), ['i'])
+
+    def update_right(self, c, val):
+        return [(self.i.c, 'l', self, -val)]
 
 
 class Branch12:
@@ -91,26 +114,6 @@ class Branch21:
             self.o.val = val
             return [(self.i2.c, 'l', self, val), (self.i1.c, 'l', self, val)]
         return []
-
-
-class Plus:
-    def __init__(self, circuit, o=None):
-        init_legs(self, locals(), ['o'])
-        circuit.plusses.append(self)
-
-    def update_right(self, c, val):
-        return [(self.o.c, 'r', self, 1)]
-
-    def update_left(self, c, val):
-        return []
-
-
-class Minus:
-    def __init__(self, circuit, i=None):
-        init_legs(self, locals(), ['i'])
-
-    def update_right(self, c, val):
-        return [(self.i.c, 'l', self, -val)]
 
 
 class Switch:
@@ -195,9 +198,9 @@ class Transistor:
 
 class NOT:
     def __init__(self, circuit, i=None, o=None):
-        branch = Branch12(circuit=circuit, i=circuit.add_plus().o)
+        branch = Branch12(circuit=circuit, i=circuit.add_plus())
         transistor = Transistor(circuit=circuit, i=branch.o2,
-                                o=circuit.add_minus().i)
+                                o=circuit.add_minus())
         self.i = transistor.switch
         self.o = branch.o1
         connect_legs(self, locals(), ['i', 'o'])
@@ -205,7 +208,7 @@ class NOT:
 
 class AND:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        transistor1 = Transistor(circuit=circuit, i=circuit.add_plus().o)
+        transistor1 = Transistor(circuit=circuit, i=circuit.add_plus())
         transistor2 = Transistor(circuit=circuit, i=transistor1.o)
         self.i1 = transistor1.switch
         self.i2 = transistor2.switch
@@ -215,7 +218,7 @@ class AND:
 
 class OR:
     def __init__(self, circuit, i1=None, i2=None, o=None):
-        branch12 = Branch12(circuit=circuit, i=circuit.add_plus().o)
+        branch12 = Branch12(circuit=circuit, i=circuit.add_plus())
         branch21 = Branch21(circuit=circuit)
         self.transistor1 = Transistor(circuit=circuit, i=branch12.o1, o=branch21.i1)
         self.transistor2 = Transistor(circuit=circuit, i=branch12.o2, o=branch21.i2)
@@ -281,7 +284,7 @@ class MultiBulbs:
         branches = [Branch12(circuit=circuit) for j in range(n)]
         self.bulbs = [Bulb(circuit=circuit,
                            i=branches[j].o1,
-                           o=circuit.add_minus().i)
+                           o=circuit.add_minus())
                       for j in range(n)]
         self.i = [branches[j].i for j in range(n)]
         self.o = [branches[j].o2 for j in range(n)]
@@ -291,10 +294,10 @@ class MultiBulbs:
 class ManualSwitches:
     def __init__(self, circuit, n, keys, we_key, o=None):
         self.switches = [Switch(circuit=circuit,
-                                i=circuit.add_plus().o,
+                                i=circuit.add_plus(),
                                 key=keys[j])
                          for j in range(n)]
-        self.we_switch = Switch(circuit=circuit, i=circuit.add_plus().o,
+        self.we_switch = Switch(circuit=circuit, i=circuit.add_plus(),
                                 key=we_key)
         we = MultiSwitch(circuit=circuit, switch=self.we_switch.o,
                          i=[self.switches[j].o for j in range(n)], n=n)
@@ -456,9 +459,9 @@ class SRAMProgrammer:
                                          we_key=pm_key, n=m)
         self.d_switches = ManualSwitches(circuit=circuit, keys=d_keys[::-1],
                                          we_key=pm_key, n=8)
-        self.re_switch = Switch(circuit=circuit, i=circuit.add_plus().o,
+        self.re_switch = Switch(circuit=circuit, i=circuit.add_plus(),
                                 key=re_key)
-        self.pm_switch = Switch(circuit=circuit, i=circuit.add_plus().o,
+        self.pm_switch = Switch(circuit=circuit, i=circuit.add_plus(),
                                 key=pm_key)
         selector = Selector(
             circuit=circuit,
@@ -556,7 +559,7 @@ class Clock:
         self.t = time.time()
 
         hlt_not = NOT(circuit=circuit)
-        transistor = Transistor(circuit=circuit, i=circuit.add_plus().o,
+        transistor = Transistor(circuit=circuit, i=circuit.add_plus(),
                                 switch=hlt_not.o)
         tr_branch = Branch12(circuit=circuit, i=transistor.o)
         self.switch = Switch(circuit=circuit, i=tr_branch.o1)
@@ -723,10 +726,10 @@ class Circuit:
     def add_plus(self):
         plus = Plus(circuit=self)
         self.plusses.append(plus)
-        return plus
+        return plus.o
 
     def add_minus(self):
-        return Minus(circuit=self)
+        return Minus(circuit=self).i
 
     def update(self, key):
         if key == '':

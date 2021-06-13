@@ -2,7 +2,7 @@ import numpy as np
 import graphics
 
 
-# Code for visualization
+# Code for visualizing the components
 
 
 black = graphics.color_rgb(10, 10, 10),
